@@ -579,7 +579,10 @@ namespace Supervertaler.Trados.Controls
                 Minimum = 5,
                 Maximum = 100,
                 Value = 20,
-                Width = 60,
+                // 80px gives the digits enough room after AutoScaleMode.Dpi
+                // scales the control at >100% Windows display scaling – at
+                // 60px the system spinner buttons take up most of the width.
+                Width = 80,
                 Location = new Point(160, 0)
             };
             var batchTip = new ToolTip { AutoPopDelay = 10000, InitialDelay = 300 };
@@ -722,7 +725,10 @@ namespace Supervertaler.Trados.Controls
             _nudSurroundingSegments = new NumericUpDown
             {
                 Location = new Point(210, 0), // positioned dynamically – label is wider than "Max segments:"
-                Width = 60,
+                // 80px gives the digits enough room after AutoScaleMode.Dpi
+                // scales the control at >100% Windows display scaling – at
+                // 60px the system spinner buttons take up most of the width.
+                Width = 80,
                 Minimum = 1,
                 Maximum = 20,
                 Value = 5,
@@ -858,7 +864,11 @@ namespace Supervertaler.Trados.Controls
             y += 24;
 
             _lblSurroundingSegments.Location = new Point(36, y + 3);
-            _nudSurroundingSegments.Location = new Point(210, y);
+            // Position the NUD dynamically against the label's actual right
+            // edge: at 150% Windows scaling the AutoSize label "Surrounding
+            // segments:" is wider than the fixed x=210 column the other rows
+            // use, so a hard-coded x would put the NUD on top of the label.
+            _nudSurroundingSegments.Location = new Point(_lblSurroundingSegments.Right + 8, y);
             y += 34;
 
             // The label "QuickLauncher prompts go to:" is wider than the

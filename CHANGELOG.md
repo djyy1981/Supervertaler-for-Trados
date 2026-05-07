@@ -1,5 +1,15 @@
 # Changelog
 
+## [4.19.77] – 2026-05-07
+
+### Fixed (AI Settings: cramped NumericUpDowns at high Windows DPI)
+
+- **At 150% Windows display scaling, the "Batch size" and "Surrounding segments" numeric inputs in Settings → AI Settings rendered with so little room for digits that the value was hard to read** – the system-drawn spinner buttons (which don't scale identically with the rest of the control) ate most of the visual width, leaving only a few pixels for the actual number. The "Surrounding segments" NUD also overlapped its own label, because the label's AutoSize width grew at high DPI but the NUD's x position was fixed at 210 px.
+- Fix at [`AiSettingsPanel.cs`](src/Supervertaler.Trados/Controls/AiSettingsPanel.cs): bump both NUDs from `Width = 60` to `Width = 80` so the AutoScaleMode.Dpi pass produces a visibly comfortable text area at any scaling. Also position `_nudSurroundingSegments` dynamically from `_lblSurroundingSegments.Right + 8` instead of the fixed x=210 column the other rows use, so the wider label at high DPI doesn't push it.
+- The other two NUDs in this panel (`_nudOllamaTimeout` at width 75, `_nudMaxSegments` at width 80) were already wide enough; no change there.
+
+---
+
 ## [4.19.76] – 2026-05-07
 
 ### Fixed (Hi-DPI: every Settings dialog and pop-up now scales with Windows display scaling)
