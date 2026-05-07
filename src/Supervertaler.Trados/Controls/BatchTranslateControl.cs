@@ -312,6 +312,9 @@ namespace Supervertaler.Trados.Controls
                 GeneratePromptRequested?.Invoke(this, EventArgs.Empty);
             var tip = new ToolTip { AutoPopDelay = 12000, InitialDelay = 300 };
             tip.SetToolTip(_lnkGeneratePrompt,
+                "Available in Translate mode only – AutoPrompt generates a\r\n" +
+                "translation prompt, so it doesn't apply to Proofread runs.\r\n" +
+                "Switch the mode toggle above to Translate to use it.\r\n\r\n" +
                 "AutoPrompt analyses your project\u2019s content, terminology (via TermScan),\r\n" +
                 "and TM data to generate a domain-specific translation prompt using AI.\r\n\r\n" +
                 "The result appears in the AI Assistant chat, where you can refine it.\r\n" +
@@ -603,7 +606,18 @@ namespace Supervertaler.Trados.Controls
 
             // Show/hide mode-specific controls
             _chkAddComments.Visible = _currentMode == BatchMode.Proofread;
-            _lnkGeneratePrompt.Visible = _currentMode == BatchMode.Translate;
+
+            // AutoPrompt is a translation-prompt generator – it makes no
+            // sense in Proofread mode. Previously we hid it entirely there,
+            // which led to a confused support email ("AutoPrompt has
+            // vanished"). Now it stays visible but greyed out, with a
+            // tooltip explaining when it works.
+            bool inTranslateMode = _currentMode == BatchMode.Translate;
+            _lnkGeneratePrompt.Enabled = inTranslateMode;
+            _lnkGeneratePrompt.LinkColor = inTranslateMode
+                ? Color.FromArgb(0, 102, 204)
+                : Color.FromArgb(150, 150, 150);
+            _lnkGeneratePrompt.DisabledLinkColor = Color.FromArgb(150, 150, 150);
             var isTranslateMode = _currentMode == BatchMode.Translate && !(_chkClipboardMode?.Checked ?? false);
             _chkTmxBackup.Visible = isTranslateMode;
             _lnkOpenBackupFolder.Visible = isTranslateMode;

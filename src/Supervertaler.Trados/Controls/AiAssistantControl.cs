@@ -289,14 +289,29 @@ namespace Supervertaler.Trados.Controls
             };
             _contextStrip.Controls.Add(_lblContext);
 
-            // Font size increase button (A+) – docked right inside context strip
+            // Font size buttons follow the Edge / Word reading-view
+            // convention: a big bold "A" on the right increases the chat
+            // font, a small regular "A" on the left decreases it. We use
+            // font size as the sole visual cue rather than tacking
+            // U+002B "+" / U+2212 "-" glyphs onto the letter, because at
+            // low DPI those glyphs collapsed into thin strokes and Daniel
+            // couldn't tell which was which – he ended up clicking the
+            // smaller-font button thinking it was the bigger one.
+            //
+            // DockStyle.Right places the first-added control at the
+            // rightmost edge, so btnChatFontUp (the BIG "A") is added
+            // first; btnChatFontDown (the SMALL "A") is added second and
+            // ends up to its left. Both have explicit tooltips so anyone
+            // hovering instantly sees which is which.
+            var fontButtonTip = new ToolTip { AutoPopDelay = 6000, InitialDelay = 400 };
+
             var btnChatFontUp = new Button
             {
-                Text = "A+",
+                Text = "A",
                 Dock = DockStyle.Right,
                 Width = UiScale.Pixels(28),
                 FlatStyle = FlatStyle.Flat,
-                Font = new Font("Segoe UI", UiScale.FontSize(9f), FontStyle.Bold),
+                Font = new Font("Segoe UI", UiScale.FontSize(11f), FontStyle.Bold),
                 ForeColor = Color.FromArgb(100, 100, 100),
                 BackColor = Color.Transparent,
                 Cursor = Cursors.Hand,
@@ -308,16 +323,16 @@ namespace Supervertaler.Trados.Controls
             btnChatFontUp.FlatAppearance.BorderSize = 0;
             btnChatFontUp.FlatAppearance.MouseOverBackColor = Color.FromArgb(220, 220, 220);
             btnChatFontUp.Click += OnChatFontIncrease;
+            fontButtonTip.SetToolTip(btnChatFontUp, "Increase chat font size");
             _contextStrip.Controls.Add(btnChatFontUp);
 
-            // Font size decrease button (A−)
             var btnChatFontDown = new Button
             {
-                Text = "A\u2212", // A followed by minus sign (−)
+                Text = "A",
                 Dock = DockStyle.Right,
                 Width = UiScale.Pixels(28),
                 FlatStyle = FlatStyle.Flat,
-                Font = new Font("Segoe UI", UiScale.FontSize(7f), FontStyle.Bold),
+                Font = new Font("Segoe UI", UiScale.FontSize(7f), FontStyle.Regular),
                 ForeColor = Color.FromArgb(100, 100, 100),
                 BackColor = Color.Transparent,
                 Cursor = Cursors.Hand,
@@ -329,6 +344,7 @@ namespace Supervertaler.Trados.Controls
             btnChatFontDown.FlatAppearance.BorderSize = 0;
             btnChatFontDown.FlatAppearance.MouseOverBackColor = Color.FromArgb(220, 220, 220);
             btnChatFontDown.Click += OnChatFontDecrease;
+            fontButtonTip.SetToolTip(btnChatFontDown, "Decrease chat font size");
             _contextStrip.Controls.Add(btnChatFontDown);
 
             // Thin separator line below context
@@ -1385,7 +1401,27 @@ namespace Supervertaler.Trados.Controls
                 // the parent. In cases where _chatPanel's automatic scroll
                 // range tracking lags the child resize by a layout cycle,
                 // this ensures the scroll range is correct right now.
-                _chatPanel.AutoScrollMinSize = new Size(0, _messageFlow.Top + desiredHeight);
+                //
+                // IMPORTANT: AutoScrollMinSize is in unscrolled (logical)
+                // coordinates and must reflect the FULL content size – it
+                // is NOT the bottom of the child in the currently-scrolled
+                // viewport. _messageFlow.Top reads as a negative number
+                // when the user has scrolled down (it's the scroll offset
+                // applied to the docked child). The previous formula
+                // ``_messageFlow.Top + desiredHeight`` therefore collapsed
+                // to roughly the viewport height as soon as the user was
+                // scrolled to the bottom of a long history, which clamped
+                // the scrollbar back to 0 and snapped the panel to the
+                // top, leaving the new bubble below the now-impossible
+                // scroll range. (Daniel reported this as "the chat scrolls
+                // upwards automatically and there is no response" with
+                // 23+ chat messages or a 40k-char AutoPrompt response.)
+                //
+                // Use desiredHeight directly: _messageFlow always lives at
+                // logical y=0 inside _chatPanel (it's the only child, no
+                // header above it), so the unscrolled bottom is just the
+                // content height.
+                _chatPanel.AutoScrollMinSize = new Size(0, desiredHeight);
             }
             finally
             {

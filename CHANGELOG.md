@@ -1,5 +1,31 @@
 # Changelog
 
+## [4.19.74] – 2026-05-07
+
+### Fixed (Chat panel: long histories caused new responses to vanish)
+
+- **In the AI Assistant Chat tab, after ~23 explain/define prompts or a 40,000+ character AutoPrompt response, the panel would freeze – the OpenRouter / GWDG / Cortecs API would return the response (visible in OpenRouter observability, tokens billed) but the chat would scroll upwards and not display anything new. The only workaround was to clear the chat.** Reported by Daniel McCosh on 2026-05-06; not actually fixed by the v4.19.1 chat-scroll rewrite.
+- Root cause at [`AiAssistantControl.UpdateChatScrollRange`](src/Supervertaler.Trados/Controls/AiAssistantControl.cs): the formula `_chatPanel.AutoScrollMinSize = new Size(0, _messageFlow.Top + desiredHeight)` was meant to be a "belt and braces" override of WinForms' automatic scroll-range tracking. But `_messageFlow.Top` is in `_chatPanel`'s scrolled coordinate system: when the user is scrolled down N px into a long chat, Top reads as `-N`, not as the unscrolled top. So at the bottom of a long history the formula collapsed to roughly the viewport height instead of the full content height. WinForms then clamped the scroll position to fit that artificially-small range, the panel snapped back to the top, and the new bubble landed below where the panel now thought the world ended.
+- Fix uses `desiredHeight` directly (the actual content height). `_messageFlow` always lives at logical y=0 inside `_chatPanel` – it's the only child, no header above it – so the unscrolled bottom is just the content height. Verified locally and matches Daniel's reported symptom exactly.
+
+### Fixed (Plugin layout broke at high Windows DPI scaling)
+
+- **At Windows display scaling above 100% (e.g. 150% on a 2560×1440 panel), the Translate / Proofread radio buttons in Batch Operations overlapped each other, the Scope/Limit/Prompt rows squished together, and the Copy/Paste Clipboard buttons collided.** Daniel reported the radio-button overlap on a real machine; reproduced locally by flipping Windows scaling to 150%.
+- Cause: the existing `UiScale.Factor` defaulted to 1.0 and was only changed by a manual TermLens settings slider. Plugin layouts that called `UiScale.Pixels()` therefore stayed at 100% sizing even as Windows scaled fonts up, and any literal pixel coordinates (e.g. `Location = new Point(100, y)` for the Proofread radio button) couldn't account for the wider AutoSize "Translate" label at higher font sizes.
+- Fix at [`UiScale`](src/Supervertaler.Trados/Core/UiScale.cs) now auto-detects the system DPI scale (`Graphics.DpiX / 96`) on plugin startup and uses it as a base layer beneath the user-configurable settings slider. `UiScale.Pixels(N)` and `UiScale.FontSize(N)` now multiply by `SystemScale × UserFactor`, so existing call sites get DPI awareness for free and the slider becomes a per-user multiplier on top of system scaling rather than the only source of scaling. `BatchTranslateControl` and `AiAssistantControl` set `AutoScaleMode = AutoScaleMode.None` so WinForms' built-in font-based autoscaling doesn't apply a second pass on top of UiScale and double up. Every hard-coded `Location` / `Size` / `Width` / `Height` literal in `BatchTranslateControl` is now wrapped through `UiScale.Pixels`, and the Translate / Proofread radio button positions are now computed dynamically from the previous button's measured `PreferredSize` so wider fonts can't push them on top of each other. The Copy / Paste Clipboard buttons get the same dynamic-position treatment.
+
+### Fixed (AI Assistant: A+ / A- font-size buttons hard to tell apart at high DPI)
+
+- **The two font-size buttons at the top of the Chat tab read "A+" and "A−" (with U+2212 minus sign), differing only by the +/− glyph and a 2-point font-size difference. At Daniel's display DPI the +/− glyphs collapsed into thin strokes and both buttons looked like plain "A". He clicked the smaller-font one expecting "increase" – and got the opposite.**
+- Fix at [`AiAssistantControl`](src/Supervertaler.Trados/Controls/AiAssistantControl.cs) drops the +/− glyphs entirely and uses font size as the sole visual cue: a big bold "A" on the right (`UiScale.FontSize(11f)` Bold) and a small regular "A" on the left (`UiScale.FontSize(7f)` Regular). Same pattern Edge and Word reading-view use, immediately readable at any DPI. Both buttons now also have explicit tooltips ("Increase chat font size" / "Decrease chat font size") so anyone hovering sees which is which.
+
+### Improved (Batch Operations: AutoPrompt visible-but-disabled in Proofread mode)
+
+- **Previously the AutoPrompt link disappeared entirely when the user selected Proofread mode**, which led to a confused support thread ("AutoPrompt has vanished – I tested on another machine to make sure it's not my screen resolution"). The link is hidden because AutoPrompt generates a *translation* prompt and doesn't apply to proofread runs, but that intent was invisible.
+- Fix at [`BatchTranslateControl`](src/Supervertaler.Trados/Controls/BatchTranslateControl.cs) keeps the link visible in Proofread mode but greys it out and prepends an "Available in Translate mode only" line to its tooltip so users immediately understand why it's disabled rather than thinking it's a bug.
+
+---
+
 ## [4.19.73] – 2026-05-06
 
 ### Fixed (Proofread: report numbering drifted from the Trados grid after merges/splits)
