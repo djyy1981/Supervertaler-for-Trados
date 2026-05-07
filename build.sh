@@ -61,6 +61,15 @@ mkdir -p "$DIST_DIR"
 rm -f "$DIST_DIR/$PLUGIN_FILENAME"
 python "$SCRIPT_DIR/package_plugin.py" "$BUILD_DIR" "$DIST_DIR/$PLUGIN_FILENAME"
 
+# Mirror the .sdlplugin into RWS AppStore/ so the AppStore Manager
+# upload step has both the plugin and that version's release notes
+# in one folder for drag-and-drop. The release notes themselves are
+# written to that folder by tools/appstore_release.py earlier.
+APPSTORE_DIR="$SCRIPT_DIR/RWS AppStore"
+mkdir -p "$APPSTORE_DIR"
+cp "$DIST_DIR/$PLUGIN_FILENAME" "$APPSTORE_DIR/$PLUGIN_FILENAME"
+echo "  Mirrored to: $APPSTORE_DIR/$PLUGIN_FILENAME"
+
 echo ""
 echo "=== Deploying to Trados Studio ==="
 

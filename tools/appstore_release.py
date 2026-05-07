@@ -9,7 +9,9 @@ Usage:
     python tools/appstore_release.py 4.17.0 4.18.3    # entries from 4.17.0 through 4.18.3
 
 Output:
-    dist/release_notes_v<version>.md   (alongside the .sdlplugin)
+    RWS AppStore/release_notes_v<version>.md
+    (build.sh mirrors the .sdlplugin into the same folder so the
+    AppStore Manager upload has both files in one place to drag from.)
 """
 import hashlib
 import os
@@ -25,7 +27,7 @@ CHANGELOG = os.path.join(BASE_DIR, "CHANGELOG.md")
 CSPROJ = os.path.join(BASE_DIR, "src", "Supervertaler.Trados", "Supervertaler.Trados.csproj")
 MANIFEST = os.path.join(BASE_DIR, "src", "Supervertaler.Trados", "pluginpackage.manifest.xml")
 SDLPLUGIN = os.path.join(BASE_DIR, "dist", "Supervertaler for Trados.sdlplugin")
-OUTPUT_DIR = os.path.join(BASE_DIR, "dist")
+OUTPUT_DIR = os.path.join(BASE_DIR, "RWS AppStore")
 
 
 def read_current_version():
