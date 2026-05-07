@@ -14,8 +14,8 @@ namespace Supervertaler.Trados.Core
     ///     <description>
     ///     <see cref="SystemScale"/> – auto-detected from Windows DPI on
     ///     plugin startup. 1.0 at 100% scaling, 1.25 at 125%, 1.5 at 150%
-    ///     and so on. This is what fixes the layout breakage Daniel saw on
-    ///     a 2560×1440 display at 150% Windows scaling.
+    ///     and so on. This is what fixes the layout breakage a user
+    ///     reported on a 2560×1440 display at 150% Windows scaling.
     ///     </description>
     ///   </item>
     ///   <item>

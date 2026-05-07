@@ -4314,7 +4314,7 @@ Always list the original source filename(s) in the `sources:` frontmatter field.
                         // it's preserved across merges (the surviving segment keeps its
                         // ID, the retired one is gone) and assigned fresh on splits, so
                         // using it as the per-file number keeps our Reports tab numbering
-                        // aligned with what Daniel/the user sees in Trados even after
+                        // aligned with what the user sees in Trados even after
                         // merging or splitting. Falling back to iteration count only when
                         // the ID isn't parseable as an int (older formats / exotic filters).
                         //

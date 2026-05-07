@@ -294,9 +294,10 @@ namespace Supervertaler.Trados.Controls
             // font, a small regular "A" on the left decreases it. We use
             // font size as the sole visual cue rather than tacking
             // U+002B "+" / U+2212 "-" glyphs onto the letter, because at
-            // low DPI those glyphs collapsed into thin strokes and Daniel
-            // couldn't tell which was which – he ended up clicking the
-            // smaller-font button thinking it was the bigger one.
+            // low DPI those glyphs collapse into thin strokes and a user
+            // reported he couldn't tell which was which – he ended up
+            // clicking the smaller-font button thinking it was the bigger
+            // one.
             //
             // DockStyle.Right places the first-added control at the
             // rightmost edge, so btnChatFontUp (the BIG "A") is added
@@ -1413,7 +1414,7 @@ namespace Supervertaler.Trados.Controls
                 // scrolled to the bottom of a long history, which clamped
                 // the scrollbar back to 0 and snapped the panel to the
                 // top, leaving the new bubble below the now-impossible
-                // scroll range. (Daniel reported this as "the chat scrolls
+                // scroll range. (Reported by a user as "the chat scrolls
                 // upwards automatically and there is no response" with
                 // 23+ chat messages or a 40k-char AutoPrompt response.)
                 //
