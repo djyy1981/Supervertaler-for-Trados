@@ -138,8 +138,13 @@ namespace Supervertaler.Trados
             // settings dialog can open and let the user enter a license key.
             _settings = TermLensSettings.Load();
 
-            // Apply global UI scale factor before any controls are created
-            UiScale.Factor = _settings.UiScaleFactor;
+            // Apply global UI scale factor before any controls are created.
+            // SeedSystemScale picks up the current Windows DPI (1.0 at 100%,
+            // 1.5 at 150%, etc.) so plugin layouts don't squish on hi-DPI
+            // displays even when the user hasn't dialled in a custom UI
+            // scale via TermLens settings. UserFactor stacks on top.
+            UiScale.SeedSystemScale();
+            UiScale.UserFactor = _settings.UiScaleFactor;
 
             // Initialize prompt library and seed default prompts on first run
             _promptLibrary = new PromptLibrary();
@@ -1557,7 +1562,10 @@ namespace Supervertaler.Trados
             var instance = _currentInstance;
             if (instance == null) return;
             instance._settings = TermLensSettings.Load();
-            UiScale.Factor = instance._settings.UiScaleFactor;
+            // Re-detect system DPI in case the user moved Trados to a
+            // different monitor since startup, then re-apply user scale.
+            UiScale.SeedSystemScale();
+            UiScale.UserFactor = instance._settings.UiScaleFactor;
             _control.Value.SetFontSize(instance._settings.PanelFontSize);
             TermBlock.UseRepeatedDigitBadges = instance._settings.TermShortcutStyle == "repeated";
 

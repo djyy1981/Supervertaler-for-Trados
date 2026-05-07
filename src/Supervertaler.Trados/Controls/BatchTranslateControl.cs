@@ -130,15 +130,29 @@ namespace Supervertaler.Trados.Controls
         private void BuildUI()
         {
             SuspendLayout();
+            // We size every layout dimension via UiScale.Pixels / UiScale.FontSize
+            // so that this control matches the system DPI even when WinForms
+            // can't infer it (Trados Studio embeds plugin UserControls in
+            // ways that confuse the default AutoScaleMode.Font heuristic).
+            // AutoScaleMode = None disables WinForms' built-in scaling so we
+            // don't end up double-scaling on top of UiScale.
+            AutoScaleMode = AutoScaleMode.None;
             BackColor = Color.White;
             AutoScroll = false;
 
             var labelColor = Color.FromArgb(80, 80, 80);
-            var headerFont = new Font("Segoe UI", 9f, FontStyle.Bold);
-            var bodyFont = new Font("Segoe UI", 8.5f);
-            var logFont = new Font("Consolas", 8f);
+            var headerFont = new Font("Segoe UI", UiScale.FontSize(9f), FontStyle.Bold);
+            var bodyFont = new Font("Segoe UI", UiScale.FontSize(8.5f));
+            var logFont = new Font("Consolas", UiScale.FontSize(8f));
 
-            var y = 10;
+            // Local helper: shorter than UiScale.Pixels at every call site.
+            int Px(int p) => UiScale.Pixels(p);
+
+            // Standard column positions used throughout the panel.
+            int leftMargin = Px(12);
+            int labelColumn = Px(100); // x-position where value controls (combo, etc.) start
+
+            var y = Px(10);
 
             // ─── Header ────────────────────────────────────────
             _lblHeader = new Label
@@ -146,24 +160,24 @@ namespace Supervertaler.Trados.Controls
                 Text = "Batch Operations",
                 Font = headerFont,
                 ForeColor = Color.FromArgb(50, 50, 50),
-                Location = new Point(12, y),
+                Location = new Point(leftMargin, y),
                 AutoSize = true
             };
             Controls.Add(_lblHeader);
-            y += 26;
+            y += Px(26);
 
             // ─── Mode Toggle ──────────────────────────────────
             _modePanel = new Panel
             {
-                Location = new Point(12, y),
-                Size = new Size(300, 24),
+                Location = new Point(leftMargin, y),
+                Size = new Size(Px(300), Px(24)),
                 BackColor = Color.Transparent
             };
 
             _rbTranslate = new RadioButton
             {
                 Text = "Translate",
-                Location = new Point(0, 2),
+                Location = new Point(0, Px(2)),
                 AutoSize = true,
                 Font = bodyFont,
                 ForeColor = labelColor,
@@ -175,23 +189,30 @@ namespace Supervertaler.Trados.Controls
             _rbProofread = new RadioButton
             {
                 Text = "Proofread",
-                Location = new Point(100, 2),
+                // Position is computed dynamically below from _rbTranslate's
+                // measured width – at high DPI / large font sizes the
+                // "Translate" label can exceed any fixed offset and overlap
+                // the second radio button. PreferredSize gives the AutoSize
+                // measurement before the control is added to its parent.
                 AutoSize = true,
                 Font = bodyFont,
                 ForeColor = labelColor,
                 FlatStyle = FlatStyle.Flat
             };
+            _rbProofread.Location = new Point(
+                _rbTranslate.PreferredSize.Width + Px(20),
+                Px(2));
 
             _modePanel.Controls.Add(_rbTranslate);
             _modePanel.Controls.Add(_rbProofread);
             Controls.Add(_modePanel);
-            y += 28;
+            y += Px(28);
 
             // ─── Clipboard Mode ──────────────────────────────────
             _chkClipboardMode = new CheckBox
             {
                 Text = "Clipboard Mode",
-                Location = new Point(12, y),
+                Location = new Point(leftMargin, y),
                 AutoSize = true,
                 Font = bodyFont,
                 ForeColor = labelColor,
@@ -204,21 +225,21 @@ namespace Supervertaler.Trados.Controls
                 "and context to the clipboard. Paste into any web-based AI (ChatGPT,\r\n" +
                 "Claude, Gemini, etc.), then paste translations back when done.");
             Controls.Add(_chkClipboardMode);
-            y += 24;
+            y += Px(24);
 
             // ─── Scope ─────────────────────────────────────────
             _lblScopeLabel = new Label
             {
                 Text = "Scope:",
-                Location = new Point(12, y + 3),
+                Location = new Point(leftMargin, y + Px(3)),
                 AutoSize = true,
                 Font = bodyFont,
                 ForeColor = labelColor
             };
             _cmbScope = new ComboBox
             {
-                Location = new Point(100, y),
-                Width = 200,
+                Location = new Point(labelColumn, y),
+                Width = Px(200),
                 DropDownStyle = ComboBoxStyle.DropDownList,
                 Font = bodyFont
             };
@@ -230,15 +251,15 @@ namespace Supervertaler.Trados.Controls
             _lblMaxSegLabel = new Label
             {
                 Text = "Limit:",
-                Location = new Point(_cmbScope.Right + 12, y + 3),
+                Location = new Point(_cmbScope.Right + Px(12), y + Px(3)),
                 AutoSize = true,
                 Font = bodyFont,
                 ForeColor = labelColor
             };
             _nudMaxSegments = new NumericUpDown
             {
-                Location = new Point(_lblMaxSegLabel.Right + 4, y),
-                Width = 60,
+                Location = new Point(_lblMaxSegLabel.Right + Px(4), y),
+                Width = Px(60),
                 Minimum = 0,
                 Maximum = 99999,
                 Value = 0,
@@ -255,21 +276,21 @@ namespace Supervertaler.Trados.Controls
                 "Useful for testing prompts on a small subset.");
             Controls.Add(_lblMaxSegLabel);
             Controls.Add(_nudMaxSegments);
-            y += 28;
+            y += Px(28);
 
             // ─── Prompt ──────────────────────────────────────────
             _lblPromptLabel = new Label
             {
                 Text = "Prompt:",
-                Location = new Point(12, y + 3),
+                Location = new Point(leftMargin, y + Px(3)),
                 AutoSize = true,
                 Font = bodyFont,
                 ForeColor = labelColor
             };
             _cmbPrompt = new ComboBox
             {
-                Location = new Point(100, y),
-                Width = 200,
+                Location = new Point(labelColumn, y),
+                Width = Px(200),
                 DropDownStyle = ComboBoxStyle.DropDownList,
                 Font = bodyFont,
             };
@@ -282,7 +303,7 @@ namespace Supervertaler.Trados.Controls
             _lnkGeneratePrompt = new LinkLabel
             {
                 Text = "AutoPrompt\u2026",
-                Location = new Point(_cmbPrompt.Right + 8, y + 2),
+                Location = new Point(_cmbPrompt.Right + Px(8), y + Px(2)),
                 AutoSize = true,
                 Font = bodyFont,
                 LinkColor = Color.FromArgb(0, 102, 204)
@@ -301,13 +322,13 @@ namespace Supervertaler.Trados.Controls
                 "generate the prompt via your paid API, then run the bulk Translate via\r\n" +
                 "clipboard against a free web-tier model.");
             Controls.Add(_lnkGeneratePrompt);
-            y += 28;
+            y += Px(28);
 
             // ─── Provider ───────────────────────────────────────
             _lblProviderLabel = new Label
             {
                 Text = "Provider:",
-                Location = new Point(12, y + 1),
+                Location = new Point(leftMargin, y + Px(1)),
                 AutoSize = true,
                 Font = bodyFont,
                 ForeColor = labelColor
@@ -315,7 +336,7 @@ namespace Supervertaler.Trados.Controls
             _lblProvider = new LinkLabel
             {
                 Text = "Not configured",
-                Location = new Point(100, y + 1),
+                Location = new Point(labelColumn, y + Px(1)),
                 AutoSize = true,
                 Font = bodyFont,
                 LinkColor = Color.FromArgb(50, 50, 50),
@@ -325,13 +346,13 @@ namespace Supervertaler.Trados.Controls
             _lblProvider.LinkClicked += OnProviderSelectorClicked;
             Controls.Add(_lblProviderLabel);
             Controls.Add(_lblProvider);
-            y += 22;
+            y += Px(22);
 
             // ─── AI Settings link ─────────────────────────────────
             _lnkAiSettings = new LinkLabel
             {
                 Text = "AI Settings\u2026",
-                Location = new Point(100, y),
+                Location = new Point(labelColumn, y),
                 AutoSize = true,
                 Font = bodyFont,
                 LinkColor = Color.FromArgb(0, 102, 204)
@@ -339,26 +360,26 @@ namespace Supervertaler.Trados.Controls
             _lnkAiSettings.LinkClicked += (s, ev) =>
                 OpenAiSettingsRequested?.Invoke(this, EventArgs.Empty);
             Controls.Add(_lnkAiSettings);
-            y += 20;
+            y += Px(20);
 
             // ─── Segment count ──────────────────────────────────
             _lblSegmentCount = new Label
             {
                 Text = "Segments: \u2014",
-                Location = new Point(12, y + 1),
+                Location = new Point(leftMargin, y + Px(1)),
                 AutoSize = true,
                 Font = bodyFont,
                 ForeColor = Color.FromArgb(100, 100, 100)
             };
             Controls.Add(_lblSegmentCount);
-            y += 28;
+            y += Px(28);
 
             // ─── Progress bar ───────────────────────────────────
             _progressBar = new ProgressBar
             {
-                Location = new Point(12, y),
-                Height = 18,
-                Width = 320,
+                Location = new Point(leftMargin, y),
+                Height = Px(18),
+                Width = Px(320),
                 Minimum = 0,
                 Maximum = 100,
                 Value = 0,
@@ -367,25 +388,25 @@ namespace Supervertaler.Trados.Controls
             _lblProgress = new Label
             {
                 Text = "",
-                Location = new Point(340, y + 1),
+                Location = new Point(Px(340), y + Px(1)),
                 AutoSize = true,
-                Font = new Font("Segoe UI", 7.5f),
+                Font = new Font("Segoe UI", UiScale.FontSize(7.5f)),
                 ForeColor = Color.FromArgb(100, 100, 100),
                 Anchor = AnchorStyles.Top | AnchorStyles.Right
             };
             Controls.Add(_progressBar);
             Controls.Add(_lblProgress);
-            y += 28;
+            y += Px(28);
 
             // ─── Translate / Stop button ────────────────────────
             _btnTranslate = new Button
             {
                 Text = "\u25B6  Translate",
-                Location = new Point(12, y),
+                Location = new Point(leftMargin, y),
                 AutoSize = true,
                 AutoSizeMode = AutoSizeMode.GrowOnly,
-                MinimumSize = new Size(120, 28),
-                Height = 28,
+                MinimumSize = new Size(Px(120), Px(28)),
+                Height = Px(28),
                 FlatStyle = FlatStyle.System,
                 Font = bodyFont
             };
@@ -395,7 +416,7 @@ namespace Supervertaler.Trados.Controls
             _chkAddComments = new CheckBox
             {
                 Text = "Also add issues as Trados comments",
-                Location = new Point(140, y + 4),
+                Location = new Point(Px(140), y + Px(4)),
                 AutoSize = true,
                 Font = bodyFont,
                 ForeColor = Color.FromArgb(80, 80, 80),
@@ -418,7 +439,7 @@ namespace Supervertaler.Trados.Controls
             int actionRowY = y;
             _btnTranslate.SizeChanged += (s, ev) =>
             {
-                _chkAddComments.Location = new Point(_btnTranslate.Right + 8, actionRowY + 4);
+                _chkAddComments.Location = new Point(_btnTranslate.Right + Px(8), actionRowY + Px(4));
                 RepositionPreviewPromptLink();
             };
 
@@ -433,7 +454,7 @@ namespace Supervertaler.Trados.Controls
                 Text = "👁  Preview prompt",
                 AutoSize = true,
                 Font = bodyFont,
-                Location = new Point(_btnTranslate.Right + 8, actionRowY + 7)
+                Location = new Point(_btnTranslate.Right + Px(8), actionRowY + Px(7))
             };
             _lnkPreviewPrompt.LinkClicked += (s, ev) =>
                 PreviewPromptRequested?.Invoke(this, EventArgs.Empty);
@@ -450,11 +471,11 @@ namespace Supervertaler.Trados.Controls
             _btnCopyToClipboard = new Button
             {
                 Text = "\uD83D\uDCCB  Copy to Clipboard",
-                Location = new Point(12, y),
+                Location = new Point(leftMargin, y),
                 AutoSize = true,
                 AutoSizeMode = AutoSizeMode.GrowOnly,
-                MinimumSize = new Size(140, 28),
-                Height = 28,
+                MinimumSize = new Size(Px(140), Px(28)),
+                Height = Px(28),
                 FlatStyle = FlatStyle.System,
                 Font = bodyFont,
                 Visible = false
@@ -466,11 +487,13 @@ namespace Supervertaler.Trados.Controls
             _btnPasteFromClipboard = new Button
             {
                 Text = "\uD83D\uDCCB  Paste from Clipboard",
-                Location = new Point(170, y),
+                // Position dynamically so it doesn't overlap the wider
+                // "Copy to Clipboard" button at high DPI / large fonts.
+                Location = new Point(_btnCopyToClipboard.Right + Px(8), y),
                 AutoSize = true,
                 AutoSizeMode = AutoSizeMode.GrowOnly,
-                MinimumSize = new Size(150, 28),
-                Height = 28,
+                MinimumSize = new Size(Px(150), Px(28)),
+                Height = Px(28),
                 FlatStyle = FlatStyle.System,
                 Font = bodyFont,
                 Visible = false,
@@ -480,13 +503,13 @@ namespace Supervertaler.Trados.Controls
                 PasteFromClipboardRequested?.Invoke(this, EventArgs.Empty);
             Controls.Add(_btnPasteFromClipboard);
 
-            y += 38;
+            y += Px(38);
 
             // ─── TMX Backup ──────────────────────────────────────
             _chkTmxBackup = new CheckBox
             {
                 Text = "Auto-backup translations to TMX",
-                Location = new Point(12, y),
+                Location = new Point(leftMargin, y),
                 AutoSize = true,
                 Font = bodyFont,
                 ForeColor = Color.FromArgb(80, 80, 80),
@@ -507,29 +530,29 @@ namespace Supervertaler.Trados.Controls
                 Font = bodyFont,
                 LinkColor = Color.FromArgb(0, 102, 204)
             };
-            _lnkOpenBackupFolder.Location = new Point(_chkTmxBackup.Right + 8, y + 2);
+            _lnkOpenBackupFolder.Location = new Point(_chkTmxBackup.Right + Px(8), y + Px(2));
             _lnkOpenBackupFolder.LinkClicked += (s, ev) =>
                 OpenBackupFolderRequested?.Invoke(this, EventArgs.Empty);
             tmxTip.SetToolTip(_lnkOpenBackupFolder,
                 "Opens the folder where backup TMX files are stored.");
             Controls.Add(_lnkOpenBackupFolder);
-            y += 24;
+            y += Px(24);
 
             // ─── Log ────────────────────────────────────────────
             _lblLog = new Label
             {
                 Text = "Log:",
-                Location = new Point(12, y),
+                Location = new Point(leftMargin, y),
                 AutoSize = true,
                 Font = bodyFont,
                 ForeColor = labelColor
             };
             Controls.Add(_lblLog);
-            y += 18;
+            y += Px(18);
 
             _txtLog = new TextBox
             {
-                Location = new Point(12, y),
+                Location = new Point(leftMargin, y),
                 Multiline = true,
                 ReadOnly = true,
                 ScrollBars = ScrollBars.Vertical,
@@ -552,12 +575,12 @@ namespace Supervertaler.Trados.Controls
         private void OnResize(object sender, EventArgs e)
         {
             if (_txtLog == null) return;
-            var w = Width - 24;
-            _txtLog.Width = Math.Max(100, w);
-            _txtLog.Height = Math.Max(40, Height - _txtLog.Top - 8);
+            var w = Width - UiScale.Pixels(24);
+            _txtLog.Width = Math.Max(UiScale.Pixels(100), w);
+            _txtLog.Height = Math.Max(UiScale.Pixels(40), Height - _txtLog.Top - UiScale.Pixels(8));
 
-            _progressBar.Width = Math.Max(100, w - 80);
-            _lblProgress.Location = new Point(_progressBar.Right + 8, _lblProgress.Top);
+            _progressBar.Width = Math.Max(UiScale.Pixels(100), w - UiScale.Pixels(80));
+            _lblProgress.Location = new Point(_progressBar.Right + UiScale.Pixels(8), _lblProgress.Top);
         }
 
         // ─── Mode Toggle ──────────────────────────────────────────
@@ -835,7 +858,7 @@ namespace Supervertaler.Trados.Controls
             {
                 foreach (var item in _cmbPrompt.Items)
                 {
-                    var w = (int)g.MeasureString(item.ToString(), _cmbPrompt.Font).Width + 24;
+                    var w = (int)g.MeasureString(item.ToString(), _cmbPrompt.Font).Width + UiScale.Pixels(24);
                     if (w > maxWidth) maxWidth = w;
                 }
             }
@@ -856,7 +879,7 @@ namespace Supervertaler.Trados.Controls
             if (_chkAddComments != null && _chkAddComments.Visible)
                 rightEdge = Math.Max(rightEdge, _chkAddComments.Right);
 
-            _lnkPreviewPrompt.Location = new Point(rightEdge + 12, _lnkPreviewPrompt.Location.Y);
+            _lnkPreviewPrompt.Location = new Point(rightEdge + UiScale.Pixels(12), _lnkPreviewPrompt.Location.Y);
         }
 
         /// <summary>
@@ -886,11 +909,11 @@ namespace Supervertaler.Trados.Controls
         private void LayoutPromptRow()
         {
             if (_cmbPrompt == null || _lnkGeneratePrompt == null) return;
-            var linkWidth = _lnkGeneratePrompt.PreferredWidth + 8; // 8px gap
-            var availableWidth = ClientSize.Width - _cmbPrompt.Left - linkWidth - 8; // 8px right margin
-            if (availableWidth < 100) availableWidth = 100;
+            var linkWidth = _lnkGeneratePrompt.PreferredWidth + UiScale.Pixels(8);
+            var availableWidth = ClientSize.Width - _cmbPrompt.Left - linkWidth - UiScale.Pixels(8);
+            if (availableWidth < UiScale.Pixels(100)) availableWidth = UiScale.Pixels(100);
             _cmbPrompt.Width = availableWidth;
-            _lnkGeneratePrompt.Left = _cmbPrompt.Right + 8;
+            _lnkGeneratePrompt.Left = _cmbPrompt.Right + UiScale.Pixels(8);
         }
 
         /// <summary>

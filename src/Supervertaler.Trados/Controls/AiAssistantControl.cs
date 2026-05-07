@@ -170,6 +170,11 @@ namespace Supervertaler.Trados.Controls
         public AiAssistantControl()
         {
             SuspendLayout();
+            // UiScale already drives every dimension and font size in this
+            // control via UiScale.Pixels / UiScale.FontSize. Disable
+            // WinForms' built-in font-based autoscaling so it doesn't apply
+            // a second scaling pass on top of UiScale at high DPI.
+            AutoScaleMode = AutoScaleMode.None;
             BackColor = Color.White;
 
             // ─── Tab control (fills entire panel) ────────────────────
