@@ -85,14 +85,21 @@ namespace Supervertaler.Trados.Controls
             };
             _headerPanel.Controls.Add(_headerLabel);
 
-            // Font size increase button (A+)
+            // Font size buttons: big bold "A" for increase, small regular "A"
+            // for decrease – same Edge / Word reading-view convention used in
+            // the AI Assistant chat header. Drops the +/- glyphs (which
+            // collapsed to thin strokes at low DPI) and relies on the size
+            // difference itself as the visual cue. Tooltips spell out which
+            // is which on hover.
+            var fontButtonTip = new ToolTip { AutoPopDelay = 6000, InitialDelay = 400 };
+
             var btnFontUp = new Button
             {
-                Text = "A+",
+                Text = "A",
                 Dock = DockStyle.Right,
                 Width = UiScale.Pixels(28),
                 FlatStyle = FlatStyle.Flat,
-                Font = new Font("Segoe UI", UiScale.FontSize(9f), FontStyle.Bold),
+                Font = new Font("Segoe UI", UiScale.FontSize(11f), FontStyle.Bold),
                 ForeColor = Color.FromArgb(100, 100, 100),
                 BackColor = Color.Transparent,
                 Cursor = Cursors.Hand,
@@ -104,16 +111,17 @@ namespace Supervertaler.Trados.Controls
             btnFontUp.FlatAppearance.BorderSize = 0;
             btnFontUp.FlatAppearance.MouseOverBackColor = Color.FromArgb(220, 220, 220);
             btnFontUp.Click += OnFontIncrease;
+            fontButtonTip.SetToolTip(btnFontUp, "Increase TermLens font size");
             _headerPanel.Controls.Add(btnFontUp);
 
             // Font size decrease button (A−)
             var btnFontDown = new Button
             {
-                Text = "A\u2212", // A followed by minus sign (−)
+                Text = "A",
                 Dock = DockStyle.Right,
                 Width = UiScale.Pixels(28),
                 FlatStyle = FlatStyle.Flat,
-                Font = new Font("Segoe UI", UiScale.FontSize(7f), FontStyle.Bold),
+                Font = new Font("Segoe UI", UiScale.FontSize(7f), FontStyle.Regular),
                 ForeColor = Color.FromArgb(100, 100, 100),
                 BackColor = Color.Transparent,
                 Cursor = Cursors.Hand,
@@ -125,6 +133,7 @@ namespace Supervertaler.Trados.Controls
             btnFontDown.FlatAppearance.BorderSize = 0;
             btnFontDown.FlatAppearance.MouseOverBackColor = Color.FromArgb(220, 220, 220);
             btnFontDown.Click += OnFontDecrease;
+            fontButtonTip.SetToolTip(btnFontDown, "Decrease TermLens font size");
             _headerPanel.Controls.Add(btnFontDown);
 
             // Status label (right of header, left of font buttons)

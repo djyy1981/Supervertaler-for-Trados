@@ -280,7 +280,10 @@ namespace Supervertaler.Trados.Controls
             var securityLink = new NoFocusCuesLinkLabel
             {
                 Text = "Source code available for security audit",
-                Location = new Point(leftPad + 30, y),
+                // Position dynamically against the shield emoji's actual right edge.
+                // At 150% Windows scaling the AutoSize emoji label was wider than
+                // the fixed 30px gap, clipping the leading "S" of "Source".
+                Location = new Point(shieldLabel.Right + 6, y),
                 AutoSize = true,
                 Font = new Font("Segoe UI", 8.5f),
                 LinkColor = Color.FromArgb(80, 120, 80),
