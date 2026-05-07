@@ -234,6 +234,11 @@ namespace Supervertaler.Trados.Controls
 
         private void BuildUI(TermbaseInfo termbase)
         {
+            // Let WinForms scale this dialog by system DPI so it doesn't squish
+            // at >100% Windows display scaling. Cheap fallback; for surfaces
+            // with their own UiScale-driven layout, set AutoScaleMode = None
+            // instead and let UiScale own scaling.
+            AutoScaleMode = AutoScaleMode.Dpi;
             Text = IsEditMode ? $"Edit term entry (ID {_termId})" : "Add term entry";
             if (termbase != null)
                 Text += $" \u2014 {termbase.Name}";

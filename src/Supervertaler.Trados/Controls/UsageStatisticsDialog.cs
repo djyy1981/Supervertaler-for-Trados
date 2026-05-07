@@ -20,6 +20,11 @@ namespace Supervertaler.Trados.Controls
 
         public UsageStatisticsDialog()
         {
+            // Let WinForms scale this dialog by system DPI so it doesn't squish
+            // at >100% Windows display scaling. Cheap fallback; for surfaces
+            // with their own UiScale-driven layout, set AutoScaleMode = None
+            // instead and let UiScale own scaling.
+            AutoScaleMode = AutoScaleMode.Dpi;
             SuspendLayout();
 
             Text = "Supervertaler for Trados";

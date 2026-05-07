@@ -15,6 +15,11 @@ namespace Supervertaler.Trados.Controls
 
         public SavePromptDialog(string defaultName = "Custom Translation Prompt")
         {
+            // Let WinForms scale this dialog by system DPI so it doesn't squish
+            // at >100% Windows display scaling. Cheap fallback; for surfaces
+            // with their own UiScale-driven layout, set AutoScaleMode = None
+            // instead and let UiScale own scaling.
+            AutoScaleMode = AutoScaleMode.Dpi;
             Text = "Save as Prompt";
             Font = new Font("Segoe UI", 9f);
             FormBorderStyle = FormBorderStyle.FixedDialog;

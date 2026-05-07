@@ -39,6 +39,11 @@ namespace Supervertaler.Trados.Controls
 
         public AddTermDialog(string sourceTerm, string targetTerm, List<TermbaseInfo> writeTermbases)
         {
+            // Let WinForms scale this dialog by system DPI so it doesn't squish
+            // at >100% Windows display scaling. Cheap fallback; for surfaces
+            // with their own UiScale-driven layout, set AutoScaleMode = None
+            // instead and let UiScale own scaling.
+            AutoScaleMode = AutoScaleMode.Dpi;
             Text = "Add Term to Termbase";
             Font = new Font("Segoe UI", 9f);
             FormBorderStyle = FormBorderStyle.FixedDialog;

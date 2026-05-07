@@ -58,6 +58,11 @@ namespace Supervertaler.Trados.Licensing
 
         private void BuildUI()
         {
+            // Let WinForms scale this dialog by system DPI so it doesn't squish
+            // at >100% Windows display scaling. Cheap fallback; for surfaces
+            // with their own UiScale-driven layout, set AutoScaleMode = None
+            // instead and let UiScale own scaling.
+            AutoScaleMode = AutoScaleMode.Dpi;
             var font = new Font("Segoe UI", 9f);
             var headingFont = new Font("Segoe UI", 9f, FontStyle.Bold);
             var smallFont = new Font("Segoe UI", 8.5f);
