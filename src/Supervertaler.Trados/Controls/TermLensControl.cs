@@ -88,19 +88,19 @@ namespace Supervertaler.Trados.Controls
             };
             _headerPanel.Controls.Add(_headerLabel);
 
-            // Font size buttons: big bold "A" for increase, small regular "A"
-            // for decrease – same Edge / Word reading-view convention used in
-            // the AI Assistant chat header. Drops the +/- glyphs (which
-            // collapsed to thin strokes at low DPI) and relies on the size
-            // difference itself as the visual cue. Tooltips spell out which
-            // is which on hover.
+            // Font size buttons: small "A" on the left to decrease, big bold
+            // "A" on the right to increase – matches the universal "− on the
+            // left, + on the right" zoom convention (browsers, macOS Books,
+            // Kindle, iOS accessibility, the Workbench TermLens panel).
+            // We drop the +/- glyphs (which collapsed to thin strokes at low
+            // DPI) and rely on the size difference itself as the visual cue;
+            // tooltips spell out which is which on hover.
             var fontButtonTip = new ToolTip { AutoPopDelay = 6000, InitialDelay = 400 };
 
             var btnFontUp = new Button
             {
                 Text = "A",
-                Dock = DockStyle.Right,
-                Width = UiScale.Pixels(28),
+                Dock = DockStyle.Fill,
                 FlatStyle = FlatStyle.Flat,
                 Font = new Font("Segoe UI", UiScale.FontSize(10f), FontStyle.Bold),
                 ForeColor = Color.FromArgb(100, 100, 100),
@@ -115,14 +115,11 @@ namespace Supervertaler.Trados.Controls
             btnFontUp.FlatAppearance.MouseOverBackColor = Color.FromArgb(220, 220, 220);
             btnFontUp.Click += OnFontIncrease;
             fontButtonTip.SetToolTip(btnFontUp, "Increase TermLens font size");
-            _headerPanel.Controls.Add(btnFontUp);
 
-            // Font size decrease button (A−)
             var btnFontDown = new Button
             {
                 Text = "A",
-                Dock = DockStyle.Right,
-                Width = UiScale.Pixels(28),
+                Dock = DockStyle.Fill,
                 FlatStyle = FlatStyle.Flat,
                 Font = new Font("Segoe UI", UiScale.FontSize(7f), FontStyle.Regular),
                 ForeColor = Color.FromArgb(100, 100, 100),
@@ -137,7 +134,28 @@ namespace Supervertaler.Trados.Controls
             btnFontDown.FlatAppearance.MouseOverBackColor = Color.FromArgb(220, 220, 220);
             btnFontDown.Click += OnFontDecrease;
             fontButtonTip.SetToolTip(btnFontDown, "Decrease TermLens font size");
-            _headerPanel.Controls.Add(btnFontDown);
+
+            // TableLayoutPanel: deterministic [col 0][col 1] ordering AND
+            // Dock=Fill cells so each button stretches to the full panel
+            // height (centred on its baseline) – fixes bold-A clipping and
+            // the visual offset we got with FlowLayoutPanel.
+            var fontButtonHost = new TableLayoutPanel
+            {
+                Dock = DockStyle.Right,
+                AutoSize = true,
+                AutoSizeMode = AutoSizeMode.GrowAndShrink,
+                ColumnCount = 2,
+                RowCount = 1,
+                Padding = Padding.Empty,
+                Margin = Padding.Empty,
+                BackColor = Color.Transparent
+            };
+            fontButtonHost.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, UiScale.Pixels(28)));
+            fontButtonHost.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, UiScale.Pixels(28)));
+            fontButtonHost.RowStyles.Add(new RowStyle(SizeType.Percent, 100f));
+            fontButtonHost.Controls.Add(btnFontDown, 0, 0);  // small a → left column
+            fontButtonHost.Controls.Add(btnFontUp,   1, 0);  // big A   → right column
+            _headerPanel.Controls.Add(fontButtonHost);
 
             // Status label (right of header, left of font buttons)
             _statusLabel = new Label

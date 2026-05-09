@@ -289,28 +289,23 @@ namespace Supervertaler.Trados.Controls
             };
             _contextStrip.Controls.Add(_lblContext);
 
-            // Font size buttons follow the Edge / Word reading-view
-            // convention: a big bold "A" on the right increases the chat
-            // font, a small regular "A" on the left decreases it. We use
-            // font size as the sole visual cue rather than tacking
-            // U+002B "+" / U+2212 "-" glyphs onto the letter, because at
-            // low DPI those glyphs collapse into thin strokes and a user
-            // reported he couldn't tell which was which – he ended up
-            // clicking the smaller-font button thinking it was the bigger
-            // one.
-            //
-            // DockStyle.Right places the first-added control at the
-            // rightmost edge, so btnChatFontUp (the BIG "A") is added
-            // first; btnChatFontDown (the SMALL "A") is added second and
-            // ends up to its left. Both have explicit tooltips so anyone
-            // hovering instantly sees which is which.
+            // Font size buttons follow the universal "− on the left, + on
+            // the right" zoom convention (browsers, macOS Books, Kindle,
+            // iOS accessibility, the Workbench TermLens panel): a small "A"
+            // on the left decreases the chat font, a big bold "A" on the
+            // right increases it. We use font size as the sole visual cue
+            // rather than tacking U+002B "+" / U+2212 "-" glyphs onto the
+            // letter, because at low DPI those glyphs collapse into thin
+            // strokes and a user reported he couldn't tell which was which
+            // – he ended up clicking the smaller-font button thinking it
+            // was the bigger one. Tooltips spell out which is which on
+            // hover.
             var fontButtonTip = new ToolTip { AutoPopDelay = 6000, InitialDelay = 400 };
 
             var btnChatFontUp = new Button
             {
                 Text = "A",
-                Dock = DockStyle.Right,
-                Width = UiScale.Pixels(28),
+                Dock = DockStyle.Fill,
                 FlatStyle = FlatStyle.Flat,
                 Font = new Font("Segoe UI", UiScale.FontSize(11f), FontStyle.Bold),
                 ForeColor = Color.FromArgb(100, 100, 100),
@@ -325,13 +320,11 @@ namespace Supervertaler.Trados.Controls
             btnChatFontUp.FlatAppearance.MouseOverBackColor = Color.FromArgb(220, 220, 220);
             btnChatFontUp.Click += OnChatFontIncrease;
             fontButtonTip.SetToolTip(btnChatFontUp, "Increase chat font size");
-            _contextStrip.Controls.Add(btnChatFontUp);
 
             var btnChatFontDown = new Button
             {
                 Text = "A",
-                Dock = DockStyle.Right,
-                Width = UiScale.Pixels(28),
+                Dock = DockStyle.Fill,
                 FlatStyle = FlatStyle.Flat,
                 Font = new Font("Segoe UI", UiScale.FontSize(7f), FontStyle.Regular),
                 ForeColor = Color.FromArgb(100, 100, 100),
@@ -346,7 +339,28 @@ namespace Supervertaler.Trados.Controls
             btnChatFontDown.FlatAppearance.MouseOverBackColor = Color.FromArgb(220, 220, 220);
             btnChatFontDown.Click += OnChatFontDecrease;
             fontButtonTip.SetToolTip(btnChatFontDown, "Decrease chat font size");
-            _contextStrip.Controls.Add(btnChatFontDown);
+
+            // TableLayoutPanel: deterministic [col 0][col 1] ordering AND
+            // Dock=Fill cells so each button stretches to the full strip
+            // height (centred on its baseline) – fixes bold-A clipping and
+            // the visual offset we got with FlowLayoutPanel.
+            var fontButtonHost = new TableLayoutPanel
+            {
+                Dock = DockStyle.Right,
+                AutoSize = true,
+                AutoSizeMode = AutoSizeMode.GrowAndShrink,
+                ColumnCount = 2,
+                RowCount = 1,
+                Padding = Padding.Empty,
+                Margin = Padding.Empty,
+                BackColor = Color.Transparent
+            };
+            fontButtonHost.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, UiScale.Pixels(28)));
+            fontButtonHost.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, UiScale.Pixels(28)));
+            fontButtonHost.RowStyles.Add(new RowStyle(SizeType.Percent, 100f));
+            fontButtonHost.Controls.Add(btnChatFontDown, 0, 0);  // small a → left column
+            fontButtonHost.Controls.Add(btnChatFontUp,   1, 0);  // big A   → right column
+            _contextStrip.Controls.Add(fontButtonHost);
 
             // Thin separator line below context
             var contextSep = new Panel
