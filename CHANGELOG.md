@@ -1,5 +1,12 @@
 # Changelog
 
+## [4.19.95] – 2026-05-11
+
+### Fixed (Prompt Editor: "Default:" combo not aligned with Description / Prompt content right edges)
+
+- The **Description** and **Prompt content** textboxes anchor to the dialog's right edge (so they stretch with the form), but the **Default:** label and combo on the Mode row sat at fixed x coordinates with no right anchor. On a resized or DPI-scaled dialog the combo's right edge drifted leftward relative to Description, making the layout look unbalanced. Anchored both controls to the right edge, with the combo's right margin set to the same 12 px used by the other textboxes — now all four right edges line up regardless of dialog size.
+
+
 ## [4.19.94] – 2026-05-11
 
 ### Fixed (Prompt Editor: "Default:" label butting up against the combo box)

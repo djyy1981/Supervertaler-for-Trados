@@ -201,28 +201,33 @@ namespace Supervertaler.Trados.Controls
             };
             Controls.Add(_chkModeClipboard);
 
-            // "Default:" + combo. Two gaps matter here, not one:
-            //   1) "Copy to clipboard" checkbox → "Default:" label
-            //   2) "Default:" label → combo
-            // Earlier passes fixed (1) but left (2) tight enough that the
-            // label visually merged with the combo. Both gaps now ~20 px.
+            // "Default:" + combo. Anchored Top|Right so they always sit
+            // flush with the right edge of the dialog, just like the
+            // Description / Prompt-content textboxes above and below.
+            // Without the right anchor the combo stayed at a fixed x
+            // while Description stretched on resize / DPI scale, and the
+            // two right edges drifted out of alignment.
+            //
+            // Combo right edge = ClientSize.Width - 12, matching the 12-px
+            // right margin used by Description and Prompt content.
             _lblDefaultMode = new Label
             {
                 Text = "Default:",
-                Location = new Point(420, y + 3),
+                Location = new Point(ClientSize.Width - 180, y + 3),
                 AutoSize = true,
                 ForeColor = labelColor,
-                Visible = false
+                Visible = false,
+                Anchor = AnchorStyles.Top | AnchorStyles.Right
             };
             Controls.Add(_lblDefaultMode);
 
             _cboDefaultMode = new ComboBox
             {
-                Location = new Point(495, y),
-                Width = 95,
+                Location = new Point(ClientSize.Width - 105, y),
+                Width = 93,
                 DropDownStyle = ComboBoxStyle.DropDownList,
                 Visible = false,
-                Anchor = AnchorStyles.Top | AnchorStyles.Left
+                Anchor = AnchorStyles.Top | AnchorStyles.Right
             };
             _cboDefaultMode.Items.AddRange(new object[] { "Assistant", "Clipboard" });
             _cboDefaultMode.SelectedIndex = 0;
