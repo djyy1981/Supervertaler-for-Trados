@@ -1,5 +1,12 @@
 # Changelog
 
+## [4.19.94] – 2026-05-11
+
+### Fixed (Prompt Editor: "Default:" label butting up against the combo box)
+
+- v4.19.93 fixed the checkbox-to-label gap but left the label-to-combo gap too tight — "Default:" was visually merging into the "Assistant" combo dropdown to its right. Pulled `_lblDefaultMode` back to x=420 and pushed `_cboDefaultMode` to x=495 / width=95, leaving ~20 px on both sides of the label.
+
+
 ## [4.19.93] – 2026-05-11
 
 ### Fixed (Prompt Editor: "Default:" label still touching "Copy to clipboard" after v4.19.92)

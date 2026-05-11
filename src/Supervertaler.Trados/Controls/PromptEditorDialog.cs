@@ -201,14 +201,15 @@ namespace Supervertaler.Trados.Controls
             };
             Controls.Add(_chkModeClipboard);
 
-            // "Default:" + combo. Pushed further right because the autoscaled
-            // "Copy to clipboard" checkbox is wider in practice (~155 px) than
-            // a naive metric suggests — at x=415 the label was still butting
-            // up against the previous checkbox with no visible gap.
+            // "Default:" + combo. Two gaps matter here, not one:
+            //   1) "Copy to clipboard" checkbox → "Default:" label
+            //   2) "Default:" label → combo
+            // Earlier passes fixed (1) but left (2) tight enough that the
+            // label visually merged with the combo. Both gaps now ~20 px.
             _lblDefaultMode = new Label
             {
                 Text = "Default:",
-                Location = new Point(435, y + 3),
+                Location = new Point(420, y + 3),
                 AutoSize = true,
                 ForeColor = labelColor,
                 Visible = false
@@ -217,8 +218,8 @@ namespace Supervertaler.Trados.Controls
 
             _cboDefaultMode = new ComboBox
             {
-                Location = new Point(490, y),
-                Width = 100,
+                Location = new Point(495, y),
+                Width = 95,
                 DropDownStyle = ComboBoxStyle.DropDownList,
                 Visible = false,
                 Anchor = AnchorStyles.Top | AnchorStyles.Left
