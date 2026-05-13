@@ -444,7 +444,7 @@ namespace Supervertaler.Trados
                 default:
                     var target = settings?.AiSettings?.QuickLauncherTarget ?? "TradosAssistant";
                     return string.Equals(target, "WorkbenchSidekick", StringComparison.OrdinalIgnoreCase)
-                        ? "&Send to Supervertaler Sidekick"
+                        ? "&Send to Supervertaler Workbench Chat"
                         : "&Send to Supervertaler Assistant";
             }
         }
@@ -456,7 +456,7 @@ namespace Supervertaler.Trados
                 case "clipboard":
                     return "Copy the expanded prompt to the system clipboard so you can paste it into an external chat (e.g. claude.ai).";
                 case "assistant":
-                    return "Send the prompt to the AI Assistant chat (in Trados or in the Workbench Sidekick, per your global setting).";
+                    return "Send the prompt to the AI Assistant chat (in Trados or in Supervertaler Workbench's Chat panel, per your global setting).";
                 default:
                     return null;
             }

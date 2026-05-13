@@ -80,9 +80,10 @@ namespace Supervertaler.Trados.Models
         /// <summary>
         /// Destinations the prompt can be dispatched to from the QuickLauncher menu.
         /// Currently supported values: "assistant" (send to the in-Trados AI Assistant
-        /// or Workbench Sidekick chat, per the user's global QuickLauncherTarget
-        /// setting) and "clipboard" (copy the expanded prompt to the system clipboard
-        /// for the user to paste into an external chat such as claude.ai).
+        /// or to Supervertaler Workbench's Chat, per the user's global
+        /// QuickLauncherTarget setting) and "clipboard" (copy the expanded prompt to
+        /// the system clipboard for the user to paste into an external chat such as
+        /// claude.ai).
         ///
         /// When the list contains a single value (the default — just "assistant"),
         /// the menu shows a flat item: clicking fires that single mode. When two or

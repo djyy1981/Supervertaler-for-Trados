@@ -1,5 +1,17 @@
 # Changelog
 
+## [4.19.99] – 2026-05-13
+
+### Changed (Workbench Chat: AI Settings dropdown + QuickLauncher menu)
+
+- Workbench's floating Sidekick window was retired in Workbench v1.10.4 and its Chat surface was promoted into Workbench itself. The Trados plugin now reflects that in three user-facing places:
+  - **AI Settings → "QuickLauncher prompts go to:" dropdown** – the second option, formerly labelled *Workbench Sidekick*, is now *Workbench Chat*. The dropdown tooltip is rewritten to describe the current destination (Workbench's AI tab → Chat sub-tab) instead of the retired Sidekick window.
+  - **Editor right-click → QuickLauncher submenu** – the *&Send to Supervertaler Sidekick* item (only shown when the global setting routes to Workbench) is now *&Send to Supervertaler Workbench Chat*. Tooltip updated to match.
+  - **Trados edit-history actionName** – when the Workbench bridge inserts a translation into the active document, the edit-history label that Trados records (visible in Studio's undo display) was *Supervertaler Sidekick*; now *Supervertaler Workbench*.
+- The on-disk persisted setting value (`settings.QuickLauncherTarget == "WorkbenchSidekick"`) is **deliberately unchanged**. It's a stable internal identifier – existing users' saved preferences continue to resolve without migration. Same rationale as the Python-side `sidekick_bridge_server.py` module name, the `SidekickBridge` C# class, the `WorkbenchSidekickClient` C# class, and the on-disk `sidekick-bridge.json` handshake filename: all wire-protocol surfaces that pre-date the v1.10.4 retirement and that we keep stable so deployed plugin versions and Workbench installs keep talking to each other.
+- Pairs with Workbench v1.10.24, which retargets the bridge to land on the AI top tab's Chat sub-tab (instead of the right-panel Chat next to the editor) when a QuickLauncher prompt arrives. The user explicitly asked for QuickLauncher prompts from Trados to land on the *full-width* Chat surface – they're general-purpose AI conversations, not segment-level translation work, so they deserve more screen real estate to read the response.
+
+
 ## [4.19.98] – 2026-05-12
 
 ### Fixed (Proof-read report segments scrambled after ticking an issue's checkbox – [#28](https://github.com/Supervertaler/Supervertaler-for-Trados/issues/28))

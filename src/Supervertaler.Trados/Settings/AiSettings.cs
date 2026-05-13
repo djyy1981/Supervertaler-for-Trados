@@ -192,14 +192,23 @@ namespace Supervertaler.Trados.Settings
         /// Where QuickLauncher prompts run. <c>"TradosAssistant"</c> (default,
         /// preserves existing behaviour) routes the prompt + response through
         /// the in-Trados AI Assistant chat. <c>"WorkbenchSidekick"</c> instead
-        /// posts the prompt to Supervertaler Workbench's Sidekick Chat via
-        /// the localhost bridge it exposes (see WorkbenchSidekickClient and
-        /// the Workbench-side modules/sidekick_bridge_server.py).
+        /// posts the prompt to Supervertaler Workbench's Chat (AI tab → Chat
+        /// sub-tab) via the localhost bridge Workbench exposes (see
+        /// WorkbenchSidekickClient and the Workbench-side
+        /// modules/sidekick_bridge_server.py).
         ///
-        /// When set to WorkbenchSidekick but the Sidekick isn't running /
-        /// reachable, the action falls back to the in-Trados Assistant with
-        /// a status line citing the reason – the user is never blocked from
-        /// running their prompt by an unavailable Sidekick.
+        /// The setting value <c>"WorkbenchSidekick"</c> is a historical
+        /// identifier kept stable for back-compat: the Workbench-side
+        /// floating Sidekick window was retired in Workbench v1.10.4, but
+        /// the wire-protocol name (and this setting value) intentionally
+        /// did not change so existing user settings keep resolving. The
+        /// user-facing label in the AI Settings UI reads "Workbench Chat"
+        /// to reflect the current reality.
+        ///
+        /// When set to WorkbenchSidekick but Workbench isn't running /
+        /// reachable, the action falls back to the in-Trados Assistant
+        /// with a status line citing the reason – the user is never
+        /// blocked from running their prompt by an unavailable Workbench.
         /// </summary>
         [DataMember(Name = "quickLauncherTarget")]
         public string QuickLauncherTarget { get; set; } = "TradosAssistant";

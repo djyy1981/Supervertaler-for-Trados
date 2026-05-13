@@ -1068,7 +1068,7 @@ namespace Supervertaler.Trados
 
             try
             {
-                _activeDocument.Selection.Target.Replace(text, "Supervertaler Sidekick");
+                _activeDocument.Selection.Target.Replace(text, "Supervertaler Workbench");
                 return null;
             }
             catch (Exception ex)

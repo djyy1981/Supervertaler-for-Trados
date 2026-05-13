@@ -766,7 +766,14 @@ namespace Supervertaler.Trados.Controls
                 DropDownStyle = ComboBoxStyle.DropDownList
             };
             _cmbQuickLauncherTarget.Items.Add("In-Trados AI Assistant");
-            _cmbQuickLauncherTarget.Items.Add("Workbench Sidekick");
+            // Display string was "Workbench Sidekick" through Trados v4.19.x \u2013
+            // renamed to "Workbench Chat" after Supervertaler Workbench v1.10.4
+            // retired the Sidekick floating window and the Chat surface was
+            // promoted into Workbench itself. The persisted setting value
+            // (settings.QuickLauncherTarget == "WorkbenchSidekick") is kept
+            // unchanged on disk so existing users' saved preferences still
+            // resolve \u2013 it's an internal identifier, never user-visible.
+            _cmbQuickLauncherTarget.Items.Add("Workbench Chat");
             _cmbQuickLauncherTarget.SelectedIndex = 0;
             var qlTargetTip = new ToolTip { AutoPopDelay = 10000, InitialDelay = 300 };
             qlTargetTip.SetToolTip(_cmbQuickLauncherTarget,
@@ -775,10 +782,11 @@ namespace Supervertaler.Trados.Controls
                 "  In-Trados AI Assistant \u2013 default. Prompt + response stay in the\r\n" +
                 "  Trados Assistant chat panel.\r\n" +
                 "\r\n" +
-                "  Workbench Sidekick \u2013 posts the prompt to Supervertaler Workbench's\r\n" +
-                "  Sidekick Chat over a localhost bridge. Useful when you prefer the\r\n" +
-                "  Sidekick's chat UI or want both products' chat history in one place.\r\n" +
-                "  Falls back to the in-Trados Assistant if Sidekick isn't running.");
+                "  Workbench Chat \u2013 posts the prompt to Supervertaler Workbench's\r\n" +
+                "  AI tab \u2192 Chat sub-tab over a localhost bridge. Useful when you\r\n" +
+                "  prefer a larger chat window for the response, or want both\r\n" +
+                "  products' chat history in one place. Falls back to the in-Trados\r\n" +
+                "  Assistant if Workbench isn't running.");
             Controls.Add(_cmbQuickLauncherTarget);
 
             // === Info label ===
