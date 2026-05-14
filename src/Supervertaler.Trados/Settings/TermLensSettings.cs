@@ -147,6 +147,16 @@ namespace Supervertaler.Trados.Settings
         [DataMember(Name = "superSearchInAssistantTab")]
         public bool SuperSearchInAssistantTab { get; set; } = false;
 
+        /// <summary>
+        /// SuperSearch search source: "ProjectFiles" (SDLXLIFF files only),
+        /// "FilesAndTms" (files + project translation memories), or "TmsOnly"
+        /// (concordance — project TMs only). Persisted until the user changes
+        /// it. Default: "ProjectFiles". Stored as a string for forward
+        /// compatibility with future modes.
+        /// </summary>
+        [DataMember(Name = "superSearchMode")]
+        public string SuperSearchMode { get; set; } = "ProjectFiles";
+
         // ─── Term shortcut style ────────────────────────────────────────
         /// <summary>
         /// How Alt+digit shortcuts work for terms beyond 9.

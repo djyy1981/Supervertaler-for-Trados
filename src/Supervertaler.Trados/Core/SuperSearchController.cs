@@ -11,6 +11,7 @@ using System.Xml;
 using Sdl.FileTypeSupport.Framework.BilingualApi;
 using Sdl.TranslationStudioAutomation.IntegrationApi;
 using Supervertaler.Trados.Controls;
+using Supervertaler.Trados.Settings;
 
 namespace Supervertaler.Trados.Core
 {
@@ -43,8 +44,8 @@ namespace Supervertaler.Trados.Core
         private EditorController _editorController;
         private IStudioDocument _activeDocument;
 
-        // Cached project SDLXLIFF file list (refreshed on document change)
-        private List<string> _projectFiles;
+        // Project root of the last completed discovery, so a document change
+        // within the same project doesn't trigger a redundant re-scan.
         private string _lastProjectRoot;
 
         // Search cancellation
@@ -64,18 +65,47 @@ namespace Supervertaler.Trados.Core
             _control.ReplaceRequested += OnReplaceRequested;
             _control.ReplaceAllRequested += OnReplaceAllRequested;
             _control.HelpRequested += (s, e) => HelpSystem.OpenHelp(HelpSystem.Topics.SuperSearch);
+            _control.ModeChanged += OnModeChanged;
+
+            // Restore the persisted search-source mode (Project files / Files + TMs / TMs only).
+            _control.SetSourceMode(ParseSourceMode(TermLensSettings.Load().SuperSearchMode));
 
             _editorController = SdlTradosStudio.Application.GetController<EditorController>();
             if (_editorController != null)
             {
                 _editorController.ActiveDocumentChanged += OnActiveDocumentChanged;
+                _activeDocument = _editorController.ActiveDocument;
 
-                if (_editorController.ActiveDocument != null)
-                {
-                    _activeDocument = _editorController.ActiveDocument;
-                    RefreshProjectFiles();
-                }
+                // Kick off project discovery so the panel is populated when it
+                // first opens. RefreshProjectFiles offloads all file I/O to a
+                // background thread, so this never blocks plugin start-up.
+                RefreshProjectFiles();
             }
+        }
+
+        // ─── Search-source mode ──────────────────────────────────
+
+        private static SuperSearchSourceMode ParseSourceMode(string s)
+        {
+            switch (s)
+            {
+                case "FilesAndTms": return SuperSearchSourceMode.FilesAndTms;
+                case "TmsOnly": return SuperSearchSourceMode.TmsOnly;
+                default: return SuperSearchSourceMode.ProjectFiles;
+            }
+        }
+
+        private void OnModeChanged(object sender, EventArgs e)
+        {
+            // Persist the mode so it survives across sessions. Fresh load-modify-
+            // save so a setting changed elsewhere in the meantime isn't clobbered.
+            try
+            {
+                var s = TermLensSettings.Load();
+                s.SuperSearchMode = _control.SelectedSourceMode.ToString();
+                s.Save();
+            }
+            catch { /* persistence failure must not break the UI */ }
         }
 
         // ─── Document Events ─────────────────────────────────────
@@ -86,55 +116,77 @@ namespace Supervertaler.Trados.Core
             RefreshProjectFiles();
         }
 
-        private void RefreshProjectFiles()
+        /// <summary>
+        /// Refreshes the project's file and TM lists shown in the panel.
+        /// Resolves the active file path here (Trados document API — UI thread),
+        /// then offloads the actual scan to a background thread. File I/O
+        /// (enumerating SDLXLIFF files, parsing the .sdlproj for TMs, probing TM
+        /// paths) must never run on the Trados UI thread — on a project whose
+        /// folder is slow to reach it would freeze, or even hang, the whole
+        /// application (notably during start-up).
+        /// </summary>
+        private void RefreshProjectFiles(bool force = false)
         {
-            if (_activeDocument == null) return;
+            var filePath = GetActiveFilePath();
+            if (string.IsNullOrEmpty(filePath)) return;
 
+            Task.Run(() => DiscoverProject(filePath, force));
+        }
+
+        /// <summary>
+        /// Background-thread project discovery: locate the project root,
+        /// enumerate its SDLXLIFF files, find its translation memories, and
+        /// publish the results to the control. Never call this on the UI thread.
+        /// </summary>
+        private void DiscoverProject(string filePath, bool force)
+        {
             try
             {
-                var activeFile = _activeDocument.ActiveFile;
-                if (activeFile == null) return;
+                var projectRoot = FindProjectRoot(filePath);
+                if (projectRoot == null) return;
 
-                var filePath = activeFile.LocalFilePath;
-                if (string.IsNullOrEmpty(filePath)) return;
+                // Skip a redundant re-scan when the project root is unchanged,
+                // unless the caller forces it.
+                if (!force && string.Equals(projectRoot, _lastProjectRoot, StringComparison.OrdinalIgnoreCase))
+                    return;
+                _lastProjectRoot = projectRoot;
 
-                // Find project root
-                var dir = Path.GetDirectoryName(filePath);
-                string projectRoot = null;
-                while (!string.IsNullOrEmpty(dir))
+                var files = XliffSearcher.FindProjectXliffFiles(filePath);
+                var tms = TmSearcher.FindProjectTms(filePath);
+
+                SafeInvoke(() =>
                 {
-                    try
-                    {
-                        if (Directory.GetFiles(dir, "*.sdlproj", SearchOption.TopDirectoryOnly).Length > 0)
-                        {
-                            projectRoot = dir;
-                            break;
-                        }
-                    }
-                    catch { }
-
-                    var parent = Path.GetDirectoryName(dir);
-                    if (parent == dir) break;
-                    dir = parent;
-                }
-
-                // Only re-scan if project root changed
-                if (projectRoot != null && projectRoot != _lastProjectRoot)
-                {
-                    _lastProjectRoot = projectRoot;
-                    _projectFiles = XliffSearcher.FindProjectXliffFiles(filePath);
-                    SafeInvoke(() =>
-                    {
-                        _control.SetProjectFiles(_projectFiles);
-                        _control.SetStatus(
-                            $"Project: {Path.GetFileName(projectRoot)} — {_projectFiles.Count} file(s)");
-                    });
-                }
+                    _control.SetProjectFiles(files);
+                    _control.SetProjectTms(tms);
+                    var tmNote = tms.Count > 0 ? $", {tms.Count} TM(s)" : "";
+                    _control.SetStatus(
+                        $"Project: {Path.GetFileName(projectRoot)} — {files.Count} file(s){tmNote}");
+                });
             }
-            catch
+            catch { /* discovery failure must not crash the plugin */ }
+        }
+
+        /// <summary>
+        /// Walks up from a file to the directory containing the project's
+        /// <c>.sdlproj</c>. Pure file-system access — safe on a background thread.
+        /// </summary>
+        private static string FindProjectRoot(string filePath)
+        {
+            var dir = Path.GetDirectoryName(filePath);
+            while (!string.IsNullOrEmpty(dir))
             {
-                _projectFiles = null;
+                try
+                {
+                    if (Directory.GetFiles(dir, "*.sdlproj", SearchOption.TopDirectoryOnly).Length > 0)
+                        return dir;
+                }
+                catch { /* permission denied — keep walking up */ }
+
+                var parent = Path.GetDirectoryName(dir);
+                if (parent == dir) break;
+                dir = parent;
             }
+            return null;
         }
 
         // ─── Search ──────────────────────────────────────────────
@@ -146,59 +198,111 @@ namespace Supervertaler.Trados.Core
             _searchCts = new CancellationTokenSource();
             var ct = _searchCts.Token;
 
-            if (_projectFiles == null || _projectFiles.Count == 0)
-            {
-                RefreshProjectFiles();
-                if (_projectFiles == null || _projectFiles.Count == 0)
-                {
-                    SafeInvoke(() =>
-                    {
-                        _control.SetStatus("No project files found. Open a file in the editor first.");
-                        _control.SetSearching(false);
-                    });
-                    return;
-                }
-            }
+            var mode = e.SourceMode;
+            bool needFiles = mode != SuperSearchSourceMode.TmsOnly;
+            bool needTms = mode != SuperSearchSourceMode.ProjectFiles;
 
-            // Use the file selection from the control (respects user's file filter)
-            var files = _control.GetSelectedFiles();
-            if (files.Count == 0)
-            {
-                SafeInvoke(() =>
-                {
-                    _control.SetStatus("No files selected. Click 'Files' to select files to search.");
-                    _control.SetSearching(false);
-                });
-                return;
-            }
+            // Resolve the active file path on the UI thread (Trados document
+            // API); everything else — project discovery AND the search itself —
+            // runs on a background thread so the Trados UI never blocks on file
+            // I/O. Re-discovering here means a file/TM added mid-session is
+            // picked up without reopening the project.
+            var activeFilePath = GetActiveFilePath();
 
             SafeInvoke(() =>
             {
                 _control.SetSearching(true);
-                _control.SetStatus("Searching...");
+                _control.SetStatus("Scanning project...");
             });
 
             var sw = Stopwatch.StartNew();
+            int searchedFiles = 0, searchedTms = 0;
+            string emptyMessage = null;
 
             try
             {
                 var results = await Task.Run(() =>
-                    XliffSearcher.Search(
-                        files, e.Query, e.Scope,
-                        e.CaseSensitive, e.UseRegex, e.WholeWord,
-                        (done, total) => SafeInvoke(() =>
-                            _control.SetStatus($"Searching... ({done}/{total} files)")),
-                        ct),
-                    ct);
+                {
+                    var projectFiles = string.IsNullOrEmpty(activeFilePath)
+                        ? new List<string>()
+                        : XliffSearcher.FindProjectXliffFiles(activeFilePath);
+                    var projectTms = string.IsNullOrEmpty(activeFilePath)
+                        ? new List<string>()
+                        : TmSearcher.FindProjectTms(activeFilePath);
+
+                    ct.ThrowIfCancellationRequested();
+
+                    // Publish the discovered lists to the control and snapshot
+                    // the user's Files/TMs selection in one synchronous UI
+                    // round-trip, so the search uses a consistent filtered set.
+                    var selected = SafeInvokeGet(() =>
+                    {
+                        _control.SetProjectFiles(projectFiles);
+                        _control.SetProjectTms(projectTms);
+                        return Tuple.Create(
+                            needFiles ? _control.GetSelectedFiles() : new List<string>(),
+                            needTms ? _control.GetSelectedTms() : new List<string>());
+                    });
+                    var files = selected?.Item1 ?? new List<string>();
+                    var tms = selected?.Item2 ?? new List<string>();
+                    searchedFiles = files.Count;
+                    searchedTms = tms.Count;
+
+                    if (files.Count == 0 && tms.Count == 0)
+                    {
+                        emptyMessage = mode == SuperSearchSourceMode.TmsOnly
+                            ? "No translation memories found for this project."
+                            : mode == SuperSearchSourceMode.ProjectFiles
+                                ? "No project files found. Open a file in the editor first."
+                                : "No project files or translation memories found. Open a file in the editor first.";
+                        return null;
+                    }
+
+                    SafeInvoke(() => _control.SetStatus("Searching..."));
+
+                    var merged = new List<SearchResult>();
+
+                    if (files.Count > 0)
+                    {
+                        merged.AddRange(XliffSearcher.Search(
+                            files, e.Query, e.Scope,
+                            e.CaseSensitive, e.UseRegex, e.WholeWord,
+                            (done, total) => SafeInvoke(() =>
+                                _control.SetStatus($"Searching files... ({done}/{total})")),
+                            ct));
+                    }
+
+                    if (tms.Count > 0)
+                    {
+                        merged.AddRange(TmSearcher.Search(
+                            tms, e.Query, e.Scope,
+                            e.CaseSensitive, e.UseRegex, e.WholeWord,
+                            (done, total) => SafeInvoke(() =>
+                                _control.SetStatus($"Searching TMs... ({done}/{total})")),
+                            ct));
+                    }
+
+                    return merged;
+                }, ct);
 
                 sw.Stop();
+
+                if (results == null)
+                {
+                    SafeInvoke(() =>
+                    {
+                        _control.SetStatus(emptyMessage ?? "Nothing to search.");
+                        _control.SetSearching(false);
+                    });
+                    return;
+                }
+
                 _lastResults = results;
 
                 SafeInvoke(() =>
                 {
                     _control.SetResults(results);
-                    _control.SetStatus(
-                        $"{results.Count} result(s) in {files.Count} file(s) — {sw.ElapsedMilliseconds} ms");
+                    _control.SetStatus(DescribeResults(results, searchedFiles, searchedTms, sw.ElapsedMilliseconds));
                     _control.SetSearching(false);
                 });
             }
@@ -218,6 +322,19 @@ namespace Supervertaler.Trados.Core
                     _control.SetSearching(false);
                 });
             }
+        }
+
+        private static string DescribeResults(List<SearchResult> results, int fileCount, int tmCount, long ms)
+        {
+            int fileHits = results.Count(r => r.Kind == ResultKind.XliffSegment);
+            int tmHits = results.Count(r => r.Kind == ResultKind.TmEntry);
+
+            if (fileCount > 0 && tmCount > 0)
+                return $"{results.Count} result(s) — {fileHits} in {fileCount} file(s), " +
+                       $"{tmHits} in {tmCount} TM(s) — {ms} ms";
+            if (tmCount > 0)
+                return $"{tmHits} result(s) in {tmCount} TM(s) — {ms} ms";
+            return $"{fileHits} result(s) in {fileCount} file(s) — {ms} ms";
         }
 
         private void OnStopRequested(object sender, EventArgs e)
@@ -240,6 +357,14 @@ namespace Supervertaler.Trados.Core
 
                 var result = _control.GetSelectedResult();
                 if (result == null) return;
+
+                // TM concordance hits aren't in any document — nothing to navigate to.
+                if (result.Kind == ResultKind.TmEntry)
+                {
+                    _control.SetStatus(
+                        "This is a translation-memory hit — use the preview pane below to copy the text.");
+                    return;
+                }
 
                 var activeFilePath = GetActiveFilePath();
                 var isSameFile = activeFilePath != null &&
@@ -288,6 +413,15 @@ namespace Supervertaler.Trados.Core
         private void OnReplaceRequested(object sender, ReplaceRequestEventArgs e)
         {
             if (e.SelectedResult == null) return;
+
+            // Replace only applies to SDLXLIFF segments, not TM concordance hits.
+            if (e.SelectedResult.Kind == ResultKind.TmEntry)
+            {
+                SafeInvoke(() => _control.SetStatus(
+                    "Replace doesn't apply to translation-memory results — select a project-file row."));
+                return;
+            }
+
             if (_activeDocument == null) return;
 
             var result = e.SelectedResult;
@@ -350,8 +484,10 @@ namespace Supervertaler.Trados.Core
         {
             if (_lastResults == null || _lastResults.Count == 0) return;
 
-            // Count target matches
+            // Count target matches. TM concordance hits aren't in any document,
+            // so Replace All only ever touches SDLXLIFF segment results.
             var targetMatches = _lastResults.Where(r =>
+                r.Kind == ResultKind.XliffSegment &&
                 IsTargetMatch(r.TargetText, e.SearchText, e.CaseSensitive, e.UseRegex, e.WholeWord)).ToList();
 
             if (targetMatches.Count == 0)
@@ -755,6 +891,26 @@ namespace Supervertaler.Trados.Core
                     action();
             }
             catch { }
+        }
+
+        /// <summary>
+        /// Synchronous variant of <see cref="SafeInvoke"/> that marshals a
+        /// value-returning delegate to the UI thread and waits for the result.
+        /// Used from the background search task to publish the discovered
+        /// file/TM lists and read back the user's selection in one round-trip.
+        /// </summary>
+        private T SafeInvokeGet<T>(Func<T> func)
+        {
+            try
+            {
+                if (_control.InvokeRequired)
+                    return (T)_control.Invoke(func);
+                return func();
+            }
+            catch
+            {
+                return default(T);
+            }
         }
     }
 }

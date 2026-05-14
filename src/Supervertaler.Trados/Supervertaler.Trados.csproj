@@ -5,8 +5,8 @@
     <UseWindowsForms>true</UseWindowsForms>
     <RootNamespace>Supervertaler.Trados</RootNamespace>
     <AssemblyName>Supervertaler.Trados</AssemblyName>
-    <Version>4.19.101</Version>
-    <InformationalVersion>4.19.101</InformationalVersion>
+    <Version>4.19.102</Version>
+    <InformationalVersion>4.19.102</InformationalVersion>
     <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
     <Authors>Michael Beijer</Authors>
     <Company>Supervertaler</Company>
@@ -66,6 +66,19 @@
     </Reference>
     <Reference Include="Sdl.Terminology.TerminologyProvider.Core">
       <HintPath>$(TradosStudioPath)\Sdl.Terminology.TerminologyProvider.Core.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <!-- Translation Memory API — used by SuperSearch's concordance / TM-search modes -->
+    <Reference Include="Sdl.LanguagePlatform.Core">
+      <HintPath>$(TradosStudioPath)\Sdl.LanguagePlatform.Core.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="Sdl.LanguagePlatform.TranslationMemory">
+      <HintPath>$(TradosStudioPath)\Sdl.LanguagePlatform.TranslationMemory.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="Sdl.LanguagePlatform.TranslationMemoryApi">
+      <HintPath>$(TradosStudioPath)\Sdl.LanguagePlatform.TranslationMemoryApi.dll</HintPath>
       <Private>false</Private>
     </Reference>
     <Reference Include="System.Net.Http" />

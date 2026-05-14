@@ -1,5 +1,22 @@
 # Changelog
 
+## [4.19.102] – 2026-05-14
+
+### Added (SuperSearch: search project translation memories — three search modes)
+
+- SuperSearch can now search the project's translation memories, not just its SDLXLIFF files. A new mode dropdown in the search bar offers three modes:
+  - **Project files** – the original behaviour: search the project's SDLXLIFF files.
+  - **Files + TMs** – search the project files *and* the project's translation memories, in one merged result list.
+  - **TMs only** – concordance mode: search only the project's translation memories, the way Studio's built-in Concordance does.
+- The selected mode is persisted across sessions until the user changes it (`superSearchMode` setting).
+- **New "TMs" button** next to "Files" — opens a selection dialog listing the project's translation memories with checkboxes, so a search can be narrowed to specific TMs. Mirrors the existing Files filter; session-scoped, resets when the project changes.
+- TM discovery reads the project's `.sdlproj` for attached translation-provider TMs and also scans the project's `Tm` subfolder. File-based `.sdltm` only — server-based (GroupShare) TMs aren't searched in this version. The project's files and TMs are re-discovered on every search, so a file or TM added to the project mid-session is picked up without reopening it.
+- TM hits go through the Trados TM API's concordance search (source-side and/or target-side, following the Scope dropdown) and are then post-filtered with the same Aa / .* / Word options as file search, so the search options behave consistently across files and TMs.
+- TM results appear in the same grid: the **File** column is renamed **File/TM** and shows the TM name in blue for TM rows; the **#** column shows the concordance match score. TM results are not navigable — double-clicking a TM row shows a hint pointing to the preview pane (where the text can be selected and copied) — and they are never touched by Replace / Replace All, which still operate only on SDLXLIFF file results. In **TMs only** mode the Replace bar is disabled.
+- All project discovery (enumerating SDLXLIFF files, parsing the `.sdlproj`, probing TM paths) runs on a background thread, so the Trados UI thread never blocks on it — during start-up or during a search.
+- New file `Core/TmSearcher.cs`; new TM API assembly references; the search-source mode is the `SuperSearchSourceMode` enum.
+
+
 ## [4.19.101] – 2026-05-14
 
 ### Added (SuperSearch: Match whole word)

@@ -9,7 +9,18 @@ using System.Xml;
 namespace Supervertaler.Trados.Core
 {
     /// <summary>
-    /// Result of a cross-file SDLXLIFF search.
+    /// Distinguishes a result that came from an SDLXLIFF project file (navigable,
+    /// replaceable) from one that came from a translation memory (concordance hit —
+    /// no document location, not navigable, not replaceable).
+    /// </summary>
+    public enum ResultKind
+    {
+        XliffSegment,
+        TmEntry
+    }
+
+    /// <summary>
+    /// Result of a cross-file SDLXLIFF search or a TM concordance search.
     /// </summary>
     public class SearchResult
     {
@@ -21,6 +32,12 @@ namespace Supervertaler.Trados.Core
         public string SourceText;
         public string TargetText;
         public string Status;
+
+        /// <summary>Where this result came from. Defaults to an SDLXLIFF segment.</summary>
+        public ResultKind Kind = ResultKind.XliffSegment;
+
+        /// <summary>TM concordance match score (0–100); 0 for SDLXLIFF results.</summary>
+        public int MatchScore;
     }
 
     /// <summary>
@@ -31,6 +48,18 @@ namespace Supervertaler.Trados.Core
         SourceAndTarget,
         SourceOnly,
         TargetOnly
+    }
+
+    /// <summary>
+    /// Which sources SuperSearch searches: the project's SDLXLIFF files only,
+    /// the files plus the project's translation memories, or the TMs only
+    /// (concordance mode).
+    /// </summary>
+    public enum SuperSearchSourceMode
+    {
+        ProjectFiles,
+        FilesAndTms,
+        TmsOnly
     }
 
     /// <summary>
@@ -407,6 +436,35 @@ namespace Supervertaler.Trados.Core
                 return text.IndexOf(query, StringComparison.Ordinal) >= 0;
 
             return text.ToLowerInvariant().IndexOf(queryLower, StringComparison.Ordinal) >= 0;
+        }
+
+        /// <summary>
+        /// Standalone match test honouring the same case / regex / whole-word
+        /// rules as the file search. Used by <see cref="TmSearcher"/> to
+        /// post-filter TM concordance hits so they obey the user's Aa / .* /
+        /// Word checkboxes just like file results do.
+        /// </summary>
+        public static bool QueryMatches(string text, string query,
+            bool caseSensitive, bool useRegex, bool wholeWord)
+        {
+            if (string.IsNullOrEmpty(text) || string.IsNullOrEmpty(query)) return false;
+
+            if (useRegex)
+            {
+                var options = caseSensitive ? RegexOptions.None : RegexOptions.IgnoreCase;
+                try { return Regex.IsMatch(text, query, options); }
+                catch { return false; }
+            }
+
+            if (wholeWord)
+            {
+                var options = caseSensitive ? RegexOptions.None : RegexOptions.IgnoreCase;
+                try { return Regex.IsMatch(text, @"\b" + Regex.Escape(query) + @"\b", options); }
+                catch { return false; }
+            }
+
+            var comparison = caseSensitive ? StringComparison.Ordinal : StringComparison.OrdinalIgnoreCase;
+            return text.IndexOf(query, comparison) >= 0;
         }
     }
 }

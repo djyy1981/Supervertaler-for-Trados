@@ -21,12 +21,14 @@ namespace Supervertaler.Trados.Controls
         private TextBox _txtSearch;
         private Button _btnSearch;
         private Button _btnStop;
+        private ComboBox _cboMode;
         private ComboBox _cboScope;
         private CheckBox _chkCaseSensitive;
         private CheckBox _chkRegex;
         private CheckBox _chkWholeWord;
         private CheckBox _chkShowReplace;
         private Button _btnFiles;
+        private Button _btnTms;
         private Button _btnHelp;
 
         // ─── Replace bar row 2 (hidden by default) ──────────────
@@ -51,6 +53,8 @@ namespace Supervertaler.Trados.Controls
         // ─── File selection state ────────────────────────────────
         private List<string> _allProjectFiles = new List<string>();
         private HashSet<string> _excludedFiles = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        private List<string> _allProjectTms = new List<string>();
+        private HashSet<string> _excludedTms = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
         // ─── Highlight state ─────────────────────────────────────
         private string _highlightQuery;
@@ -62,6 +66,9 @@ namespace Supervertaler.Trados.Controls
         private static readonly Color TextColor = Color.FromArgb(50, 50, 50);
         private static readonly Color SubtleColor = Color.FromArgb(120, 120, 120);
         private static readonly Color AltRowColor = Color.FromArgb(250, 250, 250);
+        // Translation-memory rows show their TM name in this blue in the File/TM
+        // column, to set them apart from project-file rows at a glance.
+        private static readonly Color TmNameColor = Color.FromArgb(30, 110, 195);
 
         // ─── Events ──────────────────────────────────────────────
 
@@ -82,6 +89,10 @@ namespace Supervertaler.Trados.Controls
 
         /// <summary>Fired when user clicks the help button.</summary>
         public new event EventHandler HelpRequested;
+
+        /// <summary>Fired when the user changes the search-source mode dropdown
+        /// (Project files / Files + TMs / TMs only). The controller persists it.</summary>
+        public event EventHandler ModeChanged;
 
         public SuperSearchControl()
         {
@@ -137,6 +148,27 @@ namespace Supervertaler.Trados.Controls
             _btnStop.Visible = false;
             _btnStop.Click += (s, e) => StopRequested?.Invoke(this, EventArgs.Empty);
             _searchPanel.Controls.Add(_btnStop);
+
+            _cboMode = new ComboBox
+            {
+                Font = bodyFont,
+                DropDownStyle = ComboBoxStyle.DropDownList,
+                Width = 110
+            };
+            _cboMode.Items.AddRange(new object[] { "Project files", "Files + TMs", "TMs only" });
+            _cboMode.SelectedIndex = 0;
+            _cboMode.SelectedIndexChanged += (s, e) =>
+            {
+                // Replace only applies to project-file results.
+                _chkShowReplace.Enabled = SelectedSourceMode != SuperSearchSourceMode.TmsOnly;
+                if (!_chkShowReplace.Enabled) _chkShowReplace.Checked = false;
+                ModeChanged?.Invoke(this, EventArgs.Empty);
+            };
+            var ttMode = new ToolTip();
+            ttMode.SetToolTip(_cboMode,
+                "Where to search: the project's SDLXLIFF files, the files plus the " +
+                "project's translation memories, or the TMs only (concordance)");
+            _searchPanel.Controls.Add(_cboMode);
 
             _cboScope = new ComboBox
             {
@@ -197,9 +229,15 @@ namespace Supervertaler.Trados.Controls
 
             _btnFiles = CreateButton("Files", bodyFont, 56, 26);
             var ttFiles = new ToolTip();
-            ttFiles.SetToolTip(_btnFiles, "Select which files to include in the search");
+            ttFiles.SetToolTip(_btnFiles, "Select which project files to include in the search");
             _btnFiles.Click += (s, e) => ShowFileSelectionDialog();
             _searchPanel.Controls.Add(_btnFiles);
+
+            _btnTms = CreateButton("TMs", bodyFont, 52, 26);
+            var ttTms = new ToolTip();
+            ttTms.SetToolTip(_btnTms, "Select which translation memories to include in the search");
+            _btnTms.Click += (s, e) => ShowTmSelectionDialog();
+            _searchPanel.Controls.Add(_btnTms);
 
             _btnHelp = new Button
             {
@@ -339,7 +377,7 @@ namespace Supervertaler.Trados.Controls
             _grid.Columns.Add(new DataGridViewTextBoxColumn
             {
                 Name = "colFile",
-                HeaderText = "File",
+                HeaderText = "File/TM",
                 Width = 100,
                 MinimumWidth = 50
             });
@@ -528,20 +566,22 @@ namespace Supervertaler.Trados.Controls
             int chkY = (h - _chkCaseSensitive.Height) / 2;   // vertically center checkboxes
             int cboY = (h - _cboScope.Height) / 2;            // vertically center combo
 
-            // Right-anchored controls first (right to left)
+            // Right-anchored controls first (right to left): ? , TMs, Files
             _btnHelp.Location = new Point(w - _btnHelp.Width - 4, btnY);
-            _btnFiles.Location = new Point(_btnHelp.Left - _btnFiles.Width - 4, btnY);
+            _btnTms.Location = new Point(_btnHelp.Left - _btnTms.Width - 4, btnY);
+            _btnFiles.Location = new Point(_btnTms.Left - _btnFiles.Width - 4, btnY);
 
             // Fixed controls from left after the search box
             int fixedLeft = _btnFiles.Left;
 
-            // Position from right: chkShowReplace, chkWholeWord, chkRegex, chkCaseSensitive, cboScope, btnStop, btnSearch
+            // Position from right: chkShowReplace, chkWholeWord, chkRegex, chkCaseSensitive, cboScope, cboMode, btnStop, btnSearch
             _chkShowReplace.Location = new Point(fixedLeft - _chkShowReplace.Width - 4, chkY);
             _chkWholeWord.Location = new Point(_chkShowReplace.Left - _chkWholeWord.Width - 2, chkY);
             _chkRegex.Location = new Point(_chkWholeWord.Left - _chkRegex.Width - 2, chkY);
             _chkCaseSensitive.Location = new Point(_chkRegex.Left - _chkCaseSensitive.Width - 2, chkY);
             _cboScope.Location = new Point(_chkCaseSensitive.Left - _cboScope.Width - 6, cboY);
-            _btnStop.Location = new Point(_cboScope.Left - _btnStop.Width - 4, btnY);
+            _cboMode.Location = new Point(_cboScope.Left - _cboMode.Width - 4, cboY);
+            _btnStop.Location = new Point(_cboMode.Left - _btnStop.Width - 4, btnY);
             _btnSearch.Location = new Point(_btnStop.Left - _btnSearch.Width - 2, btnY);
 
             // Search text box fills available space
@@ -703,6 +743,142 @@ namespace Supervertaler.Trados.Controls
             }
         }
 
+        // ─── TM Selection ────────────────────────────────────────
+
+        /// <summary>
+        /// Updates the list of available project translation memories
+        /// (called by the controller after it discovers the project's TMs).
+        /// </summary>
+        public void SetProjectTms(List<string> tms)
+        {
+            _allProjectTms = tms ?? new List<string>();
+            // Drop any excluded TMs that are no longer attached to the project.
+            _excludedTms.IntersectWith(_allProjectTms);
+            UpdateTmsButton();
+        }
+
+        /// <summary>
+        /// Gets the TMs to search (all project TMs minus the excluded ones).
+        /// </summary>
+        public List<string> GetSelectedTms()
+        {
+            if (_excludedTms.Count == 0)
+                return _allProjectTms;
+
+            return _allProjectTms.Where(t => !_excludedTms.Contains(t)).ToList();
+        }
+
+        private void UpdateTmsButton()
+        {
+            int included = _allProjectTms.Count - _excludedTms.Count;
+            int total = _allProjectTms.Count;
+            _btnTms.Text = included == total
+                ? $"TMs ({total})"
+                : $"TMs ({included}/{total})";
+        }
+
+        private void ShowTmSelectionDialog()
+        {
+            if (_allProjectTms.Count == 0)
+            {
+                MessageBox.Show(
+                    "No translation memories found for this project.\n\n" +
+                    "Attach a TM in the project's translation-memory settings, then search again.",
+                    "SuperSearch", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return;
+            }
+
+            using (var dlg = new Form())
+            {
+                dlg.Text = "SuperSearch — Select Translation Memories";
+                dlg.Size = new Size(600, 450);
+                dlg.MinimumSize = new Size(400, 250);
+                dlg.StartPosition = FormStartPosition.CenterParent;
+                dlg.FormBorderStyle = FormBorderStyle.Sizable;
+                dlg.ShowIcon = false;
+                dlg.ShowInTaskbar = false;
+                dlg.Font = new Font("Segoe UI", 9f);
+
+                var lblInfo = new Label
+                {
+                    Text = "Select which translation memories to include in the search:",
+                    Dock = DockStyle.Top,
+                    Height = 28,
+                    Padding = new Padding(8, 8, 8, 0),
+                    ForeColor = TextColor
+                };
+                dlg.Controls.Add(lblInfo);
+
+                var clb = new CheckedListBox
+                {
+                    Dock = DockStyle.Fill,
+                    CheckOnClick = true,
+                    Font = new Font("Segoe UI", 8.5f),
+                    IntegralHeight = false,
+                    BorderStyle = BorderStyle.FixedSingle
+                };
+
+                foreach (var tm in _allProjectTms)
+                {
+                    var shortName = Path.GetFileNameWithoutExtension(tm);
+                    bool isChecked = !_excludedTms.Contains(tm);
+                    clb.Items.Add(shortName, isChecked);
+                }
+                dlg.Controls.Add(clb);
+
+                // Bottom panel with Select All / None / OK
+                var bottomPanel = new Panel
+                {
+                    Dock = DockStyle.Bottom,
+                    Height = 40,
+                    BackColor = HeaderBg,
+                    Padding = new Padding(8, 6, 8, 6)
+                };
+
+                var btnSelectAll = CreateButton("Select All", dlg.Font, 90, 28);
+                btnSelectAll.Location = new Point(8, 6);
+                btnSelectAll.Click += (s, e) =>
+                {
+                    for (int i = 0; i < clb.Items.Count; i++)
+                        clb.SetItemChecked(i, true);
+                };
+                bottomPanel.Controls.Add(btnSelectAll);
+
+                var btnSelectNone = CreateButton("Select None", dlg.Font, 100, 28);
+                btnSelectNone.Location = new Point(btnSelectAll.Right + 4, 6);
+                btnSelectNone.Click += (s, e) =>
+                {
+                    for (int i = 0; i < clb.Items.Count; i++)
+                        clb.SetItemChecked(i, false);
+                };
+                bottomPanel.Controls.Add(btnSelectNone);
+
+                var btnOk = CreateButton("OK", dlg.Font, 70, 28);
+                btnOk.Anchor = AnchorStyles.Top | AnchorStyles.Right;
+                btnOk.Location = new Point(bottomPanel.Width - btnOk.Width - 8, 6);
+                btnOk.Click += (s, e) =>
+                {
+                    _excludedTms.Clear();
+                    for (int i = 0; i < clb.Items.Count; i++)
+                    {
+                        if (!clb.GetItemChecked(i))
+                            _excludedTms.Add(_allProjectTms[i]);
+                    }
+                    UpdateTmsButton();
+                    dlg.DialogResult = DialogResult.OK;
+                };
+                bottomPanel.Controls.Add(btnOk);
+
+                dlg.Controls.Add(bottomPanel);
+                dlg.AcceptButton = btnOk;
+
+                // Fix z-order
+                clb.BringToFront();
+
+                dlg.ShowDialog(this);
+            }
+        }
+
         // ─── Public Methods ──────────────────────────────────────
 
         /// <summary>
@@ -727,10 +903,28 @@ namespace Supervertaler.Trados.Controls
 
             foreach (var r in results)
             {
-                var idx = _grid.Rows.Add(r.FileName, r.SegmentNumber, r.SourceText, r.TargetText, r.Status);
+                // TM concordance hits have no segment number; show the match
+                // score in the # column instead and a "TM" status.
+                var isTm = r.Kind == ResultKind.TmEntry;
+                var numCell = isTm
+                    ? (r.MatchScore > 0 ? r.MatchScore + "%" : "")
+                    : r.SegmentNumber.ToString();
+
+                var idx = _grid.Rows.Add(r.FileName, numCell, r.SourceText, r.TargetText, r.Status);
                 var row = _grid.Rows[idx];
                 row.Tag = r;
-                row.Cells["colFile"].ToolTipText = r.FilePath;
+
+                var fileCell = row.Cells["colFile"];
+                fileCell.ToolTipText = isTm
+                    ? "Translation memory: " + r.FilePath
+                    : r.FilePath;
+                if (isTm)
+                {
+                    // Tint the TM name blue so TM hits stand out from file rows.
+                    fileCell.Style.ForeColor = TmNameColor;
+                    fileCell.Style.SelectionForeColor = TmNameColor;
+                }
+
                 row.Cells["colSource"].ToolTipText = r.SourceText;
                 row.Cells["colTarget"].ToolTipText = r.TargetText;
             }
@@ -770,6 +964,46 @@ namespace Supervertaler.Trados.Controls
         /// Gets the current search query text.
         /// </summary>
         public string SearchQuery => _txtSearch.Text;
+
+        /// <summary>
+        /// The currently selected search-source mode (Project files / Files + TMs / TMs only).
+        /// </summary>
+        public SuperSearchSourceMode SelectedSourceMode
+        {
+            get
+            {
+                switch (_cboMode.SelectedIndex)
+                {
+                    case 1: return SuperSearchSourceMode.FilesAndTms;
+                    case 2: return SuperSearchSourceMode.TmsOnly;
+                    default: return SuperSearchSourceMode.ProjectFiles;
+                }
+            }
+        }
+
+        /// <summary>
+        /// Restores the search-source mode dropdown (e.g. from persisted settings
+        /// on startup). Does not raise <see cref="ModeChanged"/>.
+        /// </summary>
+        public void SetSourceMode(SuperSearchSourceMode mode)
+        {
+            int idx;
+            switch (mode)
+            {
+                case SuperSearchSourceMode.FilesAndTms: idx = 1; break;
+                case SuperSearchSourceMode.TmsOnly: idx = 2; break;
+                default: idx = 0; break;
+            }
+
+            // Suppress the ModeChanged event for a programmatic restore.
+            var handler = ModeChanged;
+            ModeChanged = null;
+            _cboMode.SelectedIndex = idx;
+            ModeChanged = handler;
+
+            _chkShowReplace.Enabled = mode != SuperSearchSourceMode.TmsOnly;
+            if (!_chkShowReplace.Enabled) _chkShowReplace.Checked = false;
+        }
 
         /// <summary>
         /// Gets the current replace text.
@@ -1018,7 +1252,8 @@ namespace Supervertaler.Trados.Controls
                 Scope = scope,
                 CaseSensitive = _chkCaseSensitive.Checked,
                 UseRegex = _chkRegex.Checked,
-                WholeWord = _chkWholeWord.Checked
+                WholeWord = _chkWholeWord.Checked,
+                SourceMode = SelectedSourceMode
             });
         }
 
@@ -1106,6 +1341,7 @@ namespace Supervertaler.Trados.Controls
         public bool CaseSensitive { get; set; }
         public bool UseRegex { get; set; }
         public bool WholeWord { get; set; }
+        public SuperSearchSourceMode SourceMode { get; set; }
     }
 
     public class ReplaceRequestEventArgs : EventArgs
