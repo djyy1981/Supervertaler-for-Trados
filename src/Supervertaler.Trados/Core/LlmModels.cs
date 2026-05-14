@@ -48,7 +48,7 @@ namespace Supervertaler.Trados.Core
         {
             new LlmModelInfo
             {
-                Id = "gpt-5.4", DisplayName = "GPT-5.4",
+                Id = "gpt-5.5", DisplayName = "GPT-5.5",
                 Description = "Premium quality – OpenAI's most advanced model, ideal for AutoPrompt and complex translation tasks",
                 Provider = LlmProvider.OpenAi
             },
@@ -235,7 +235,7 @@ namespace Supervertaler.Trados.Core
             },
             new LlmModelInfo
             {
-                Id = "openai/gpt-5.4", DisplayName = "GPT-5.4",
+                Id = "openai/gpt-5.5", DisplayName = "GPT-5.5",
                 Description = "Premium quality – OpenAI's most advanced model",
                 Provider = LlmProvider.OpenRouter
             },

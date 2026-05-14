@@ -18,6 +18,10 @@ namespace Supervertaler.Trados.Controls
         // Provider + Model
         private ComboBox _cmbProvider;
         private ComboBox _cmbModel;
+        // Optional free-text model ID — overrides _cmbModel when filled. Lets
+        // users pick a model that isn't in the curated dropdown (e.g. a new
+        // release, a preview model, or an OpenRouter router like openrouter/free).
+        private TextBox _txtCustomModelId;
 
         // API Key
         private TextBox _txtApiKey;
@@ -172,7 +176,43 @@ namespace Supervertaler.Trados.Controls
                     dlg.ShowDialog(this);
             };
             Controls.Add(lnkViewModels);
-            y += 22;
+            y += 24;
+
+            // === Custom model ID (optional — overrides the dropdown) ===
+            var lblCustomModelId = new Label
+            {
+                // Must be short enough to clear the x=16..120 label column with
+                // real margin — at the panel font + Windows display scaling,
+                // "Custom model:" (~89px) still ran into the textbox. "Model ID:"
+                // (~58px) keeps ~45px+ clearance at any scale. The hint label and
+                // tooltip carry the "custom / overrides the dropdown" meaning.
+                Text = "Model ID:",
+                Location = new Point(16, y + 3),
+                AutoSize = true,
+                ForeColor = labelColor
+            };
+            _txtCustomModelId = new TextBox
+            {
+                Location = new Point(120, y),
+                Width = 260
+            };
+            var lblCustomModelHint = new Label
+            {
+                Text = "(optional – overrides the dropdown above)",
+                Location = new Point(388, y + 3),
+                AutoSize = true,
+                ForeColor = Color.FromArgb(140, 140, 140),
+                Font = new Font("Segoe UI", 8f, FontStyle.Italic)
+            };
+            var ttCustomModel = new ToolTip();
+            ttCustomModel.SetToolTip(_txtCustomModelId,
+                "Enter an exact model ID to use a model that isn't in the dropdown " +
+                "(e.g. a new release, a preview model, or an OpenRouter router such " +
+                "as \"openrouter/free\"). Leave blank to use the model selected above.");
+            Controls.Add(lblCustomModelId);
+            Controls.Add(_txtCustomModelId);
+            Controls.Add(lblCustomModelHint);
+            y += 32;
 
             // === API Key ===
             var lblApiKey = new Label
@@ -229,7 +269,10 @@ namespace Supervertaler.Trados.Controls
             _lblStatus = new Label
             {
                 Text = "",
-                Location = new Point(250, y + 4),
+                // Sit past the Test Connection button's right edge — at x=250 the
+                // label started underneath the 160px-wide button (which is in
+                // front in z-order), clipping the start of "Connected".
+                Location = new Point(_btnTestConnection.Right + 8, y + 4),
                 AutoSize = true,
                 ForeColor = Color.FromArgb(100, 100, 100),
                 Font = new Font("Segoe UI", 8.5f)
@@ -1049,35 +1092,35 @@ namespace Supervertaler.Trados.Controls
             var provider = GetSelectedProviderKey();
             settings.SelectedProvider = provider;
 
-            // Model
+            // Model — a custom model ID (if entered) overrides the curated dropdown.
             var selectedModel = _cmbModel.SelectedItem as ModelItem;
+            var customModelId = _txtCustomModelId.Text.Trim();
+            var modelId = customModelId.Length > 0 ? customModelId : selectedModel?.Id;
             switch (provider)
             {
                 case LlmModels.ProviderOpenAi:
-                    settings.OpenAiModel = selectedModel?.Id ?? "gpt-5.4-mini";
+                    settings.OpenAiModel = modelId ?? "gpt-5.4-mini";
                     break;
                 case LlmModels.ProviderClaude:
-                    settings.ClaudeModel = selectedModel?.Id ?? "claude-sonnet-4-6";
+                    settings.ClaudeModel = modelId ?? "claude-sonnet-4-6";
                     break;
                 case LlmModels.ProviderGemini:
-                    settings.GeminiModel = selectedModel?.Id ?? "gemini-2.5-flash";
+                    settings.GeminiModel = modelId ?? "gemini-2.5-flash";
                     break;
                 case LlmModels.ProviderGrok:
-                    settings.GrokModel = selectedModel?.Id ?? "grok-4.20-0309-non-reasoning";
+                    settings.GrokModel = modelId ?? "grok-4.20-0309-non-reasoning";
                     break;
                 case LlmModels.ProviderMistral:
-                    settings.MistralModel = selectedModel?.Id ?? "mistral-large-latest";
+                    settings.MistralModel = modelId ?? "mistral-large-latest";
                     break;
                 case LlmModels.ProviderDeepSeek:
-                    settings.DeepSeekModel = selectedModel?.Id ?? "deepseek-v4-pro";
+                    settings.DeepSeekModel = modelId ?? "deepseek-v4-pro";
                     break;
                 case LlmModels.ProviderOpenRouter:
-                    // OpenRouter allows typed-in custom model IDs
-                    settings.OpenRouterModel = selectedModel?.Id
-                        ?? (_cmbModel.Text?.Trim().Length > 0 ? _cmbModel.Text.Trim() : "anthropic/claude-sonnet-4.6");
+                    settings.OpenRouterModel = modelId ?? "anthropic/claude-sonnet-4.6";
                     break;
                 case LlmModels.ProviderOllama:
-                    settings.OllamaModel = selectedModel?.Id ?? "translategemma:12b";
+                    settings.OllamaModel = modelId ?? "translategemma:12b";
                     break;
             }
 
@@ -1147,11 +1190,6 @@ namespace Supervertaler.Trados.Controls
             // Auto-size the dropdown to fit the longest model description
             AutoSizeDropDown(_cmbModel);
 
-            // OpenRouter: allow typing any model ID; other providers: pick from list only
-            _cmbModel.DropDownStyle = providerKey == LlmModels.ProviderOpenRouter
-                ? ComboBoxStyle.DropDown
-                : ComboBoxStyle.DropDownList;
-
             if (_cmbModel.Items.Count > 0)
                 _cmbModel.SelectedIndex = 0;
 
@@ -1169,6 +1207,13 @@ namespace Supervertaler.Trados.Controls
 
             // Model field: hide for Custom OpenAI (uses profile's model)
             _cmbModel.Enabled = providerKey != LlmModels.ProviderCustomOpenAi;
+
+            // Custom model ID field: same enable rule. Cleared on every provider
+            // switch — the value is provider-specific. During settings load,
+            // SetSelectedModel runs after this and re-fills it if the saved model
+            // isn't in the curated dropdown.
+            _txtCustomModelId.Enabled = providerKey != LlmModels.ProviderCustomOpenAi;
+            _txtCustomModelId.Text = "";
 
             // Clear status
             _lblStatus.Text = "";
@@ -1434,11 +1479,12 @@ namespace Supervertaler.Trados.Controls
             var provider = GetSelectedProviderKey();
             if (provider == LlmModels.ProviderCustomOpenAi)
                 return _txtCustomModel.Text.Trim();
-            // For OpenRouter, the user may have typed a custom model ID
+            // A custom model ID, if entered, overrides the curated dropdown.
+            var customId = _txtCustomModelId.Text.Trim();
+            if (customId.Length > 0)
+                return customId;
             var modelItem = _cmbModel.SelectedItem as ModelItem;
             if (modelItem != null) return modelItem.Id;
-            if (provider == LlmModels.ProviderOpenRouter && !string.IsNullOrWhiteSpace(_cmbModel.Text))
-                return _cmbModel.Text.Trim();
             return "gpt-5.4-mini";
         }
 
@@ -1468,6 +1514,8 @@ namespace Supervertaler.Trados.Controls
                 default: return;
             }
 
+            _txtCustomModelId.Text = "";
+
             for (int i = 0; i < _cmbModel.Items.Count; i++)
             {
                 if (((ModelItem)_cmbModel.Items[i]).Id == targetId)
@@ -1477,12 +1525,10 @@ namespace Supervertaler.Trados.Controls
                 }
             }
 
-            // For OpenRouter: if the saved model isn't in the curated list, show it as typed text
-            if (settings.SelectedProvider == LlmModels.ProviderOpenRouter
-                && !string.IsNullOrEmpty(targetId))
-            {
-                _cmbModel.Text = targetId;
-            }
+            // The saved model isn't in the curated dropdown — show it in the
+            // custom model ID field instead (works for any provider).
+            if (!string.IsNullOrEmpty(targetId))
+                _txtCustomModelId.Text = targetId;
         }
 
         private void PopulateCustomProfiles(AiSettings settings)

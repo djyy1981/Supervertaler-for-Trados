@@ -1,5 +1,23 @@
 # Changelog
 
+## [4.19.103] – 2026-05-14
+
+### Added (AI Settings: custom model ID field – [#24](https://github.com/Supervertaler/Supervertaler-for-Trados/issues/24))
+
+- **New "Custom model ID" field in AI Settings**, below the Model dropdown, available for every cloud provider. Enter an exact model ID to use a model that isn't in the curated dropdown – a new release, a preview model, or an OpenRouter router such as `openrouter/free`. When filled it overrides the dropdown selection; leave it blank to use the model picked from the dropdown.
+- Previously only OpenRouter allowed a custom model, and only by typing over the dropdown's display text (a "Name – Description" string) – confusing, since you had to overwrite a description with a bare ID, with no cue that the field was even editable. The OpenRouter dropdown is now a normal locked list like every other provider, and the dedicated Custom model ID field gives all providers one clear, consistent way to enter a model that isn't listed. A model ID saved this way that isn't in the curated list is shown back in the Custom model ID field when Settings reopens (so existing OpenRouter custom-model users migrate seamlessly).
+
+### Changed (OpenAI model lineup: GPT-5.4 → GPT-5.5)
+
+- **The curated OpenAI model is now GPT-5.5** (`gpt-5.5`), OpenAI's new frontier model (released April 2026), replacing GPT-5.4 in both the OpenAI and OpenRouter dropdowns. It's more capable and, at $5 / $30 per 1M tokens, cheaper than GPT-5.4 was.
+- **GPT-5.4 Mini stays** as the recommended everyday default — there is no "GPT-5.5 mini", and at ~$0.75 / $4.50 per 1M tokens GPT-5.4 Mini is roughly 7× cheaper than GPT-5.5, which is the right choice for high-volume batch translation. The split is deliberate: GPT-5.4 Mini for everyday/batch work, GPT-5.5 for AutoPrompt and complex tasks.
+- Users who had GPT-5.4 explicitly selected are not migrated — `gpt-5.4` still works on the API and now simply shows in the Custom model field; its cost-estimate pricing is kept under the legacy section.
+
+### Fixed (AI Settings: "Connected" status text clipped)
+
+- After clicking **Test Connection**, the green "✓ Connected" status was drawn starting underneath the Test Connection button – the label sat at x=250 while the 160px-wide button reaches x=280, and the button is in front in z-order, so the first few characters were hidden. The status label now starts past the button's right edge.
+
+
 ## [4.19.102] – 2026-05-14
 
 ### Added (SuperSearch: search project translation memories — three search modes)

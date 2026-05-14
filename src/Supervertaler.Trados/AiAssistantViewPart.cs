@@ -742,7 +742,7 @@ namespace Supervertaler.Trados
                     $"This request will send approximately {tokenStr} tokens to {capturedModel}.\n" +
                     $"Estimated input cost: ~${costStr}\n\n" +
                     "Tip: use GPT-5.4 Mini for everyday queries \u2014 it is much cheaper.\n" +
-                    "Use GPT-5.4 only for AutoPrompt or complex tasks.\n\n" +
+                    "Use GPT-5.5 only for AutoPrompt or complex tasks.\n\n" +
                     "Continue?",
                     "Cost Warning",
                     System.Windows.Forms.MessageBoxButtons.YesNo,
