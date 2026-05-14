@@ -92,7 +92,7 @@ namespace Supervertaler.Trados.Core
         {
             new LlmModelInfo
             {
-                Id = "gemini-2.5-flash", DisplayName = "Gemini 2.5 Flash",
+                Id = "gemini-3.1-flash-lite", DisplayName = "Gemini 3.1 Flash-Lite",
                 Description = "Recommended – fast, affordable, 1M context",
                 Provider = LlmProvider.Gemini
             },
@@ -110,14 +110,8 @@ namespace Supervertaler.Trados.Core
             },
             new LlmModelInfo
             {
-                Id = "gemma-4-31b-it", DisplayName = "Gemma 4 31B",
-                Description = "Open-source – strong multilingual quality, 256K context",
-                Provider = LlmProvider.Gemini
-            },
-            new LlmModelInfo
-            {
                 Id = "gemma-4-26b-a4b-it", DisplayName = "Gemma 4 26B MoE",
-                Description = "Open-source – lightweight MoE variant, 256K context",
+                Description = "Open-source – fast, strong multilingual quality, 256K context",
                 Provider = LlmProvider.Gemini
             }
         };

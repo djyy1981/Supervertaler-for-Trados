@@ -1,5 +1,13 @@
 # Changelog
 
+## [4.19.104] – 2026-05-14
+
+### Changed (Gemini model lineup refresh)
+
+- **Gemini 2.5 Flash → Gemini 3.1 Flash-Lite** (`gemini-3.1-flash-lite`) as the recommended Gemini model – cheaper ($0.25 / $1.50 per 1M tokens), faster, and positioned by Google for high-volume work like translation. `gemini-2.5-flash` is removed from the curated list; anyone still on it keeps working (it now shows in the Model ID field).
+- **Removed Gemma 4 31B from the Gemini list.** It sat within ~1% of Gemma 4 26B MoE on quality while the 26B MoE is 2–2.5× faster, so keeping both was redundant. Gemma 4 26B MoE stays as the open-source option.
+
+
 ## [4.19.103] – 2026-05-14
 
 ### Added (AI Settings: custom model ID field – [#24](https://github.com/Supervertaler/Supervertaler-for-Trados/issues/24))

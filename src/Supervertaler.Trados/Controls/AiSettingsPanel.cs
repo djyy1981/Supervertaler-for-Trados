@@ -1105,7 +1105,7 @@ namespace Supervertaler.Trados.Controls
                     settings.ClaudeModel = modelId ?? "claude-sonnet-4-6";
                     break;
                 case LlmModels.ProviderGemini:
-                    settings.GeminiModel = modelId ?? "gemini-2.5-flash";
+                    settings.GeminiModel = modelId ?? "gemini-3.1-flash-lite";
                     break;
                 case LlmModels.ProviderGrok:
                     settings.GrokModel = modelId ?? "grok-4.20-0309-non-reasoning";

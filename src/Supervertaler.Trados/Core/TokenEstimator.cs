@@ -30,7 +30,7 @@ namespace Supervertaler.Trados.Core
             { "claude-opus-4-6",           (15.00m,  75.00m) },
 
             // Google Gemini
-            { "gemini-2.5-flash",          (0.15m,   0.60m)  },
+            { "gemini-3.1-flash-lite",     (0.25m,   1.50m)  },
             { "gemini-2.5-pro",            (1.25m,   10.00m) },
             { "gemini-3.1-pro-preview",    (2.00m,   12.00m) },
 
