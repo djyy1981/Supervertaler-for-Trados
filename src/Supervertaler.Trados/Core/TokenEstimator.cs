@@ -34,9 +34,7 @@ namespace Supervertaler.Trados.Core
             { "gemini-3.1-pro-preview",    (2.00m,   12.00m) },
 
             // Grok (xAI)
-            { "grok-4.20-0309-non-reasoning", (3.00m,  15.00m) },
-            { "grok-4-1-fast-non-reasoning",  (0.20m,  0.50m)  },
-            { "grok-4.20-0309-reasoning",     (3.00m,  15.00m) },
+            { "grok-4.3",                     (1.25m,  2.50m)  },
 
             // Mistral AI
             { "mistral-large-latest",         (2.00m,  6.00m)  },

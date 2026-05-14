@@ -1,5 +1,12 @@
 # Changelog
 
+## [4.19.107] – 2026-05-14
+
+### Changed (Grok list trimmed to one current model)
+
+- **Grok list is now just Grok 4.3** (`grok-4.3`), xAI's current flagship. The previous entries – Grok 4.20, Grok 4.1 Fast, and Grok 4.20 (Reasoning) – were stale, and some of those slugs are in xAI's 15 May 2026 API retirement. Grok 4.3 is a single unified model (xAI dropped the separate reasoning / non-reasoning variants), priced $1.25 / $2.50 per 1M tokens. Grok stays a supported provider; the list is just current and minimal now. Anyone on an old Grok model keeps working via the Model ID field, and xAI redirects retired slugs to `grok-4.3` anyway.
+
+
 ## [4.19.106] – 2026-05-14
 
 ### Changed (Claude list trimmed; Opus pricing corrected)

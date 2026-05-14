@@ -174,24 +174,9 @@ namespace Supervertaler.Trados.Core
         {
             new LlmModelInfo
             {
-                Id = "grok-4.20-0309-non-reasoning", DisplayName = "Grok 4.20",
-                Description = "Recommended – highest quality, 2M context",
+                Id = "grok-4.3", DisplayName = "Grok 4.3",
+                Description = "xAI's latest flagship – fast and capable",
                 Provider = LlmProvider.Grok
-            },
-            new LlmModelInfo
-            {
-                Id = "grok-4-1-fast-non-reasoning", DisplayName = "Grok 4.1 Fast",
-                Description = "Fast and affordable – great for batch jobs",
-                Provider = LlmProvider.Grok
-            },
-            new LlmModelInfo
-            {
-                Id = "grok-4.20-0309-reasoning", DisplayName = "Grok 4.20 (Reasoning)",
-                Description = "Deep reasoning – ideal for prompt generation",
-                Provider = LlmProvider.Grok,
-                IsReasoningModel = true,
-                DefaultTimeoutMs = 600_000,
-                DefaultMaxTokens = 32768
             }
         };
 
