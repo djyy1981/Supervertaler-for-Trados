@@ -1,5 +1,15 @@
 # Changelog
 
+## [4.19.110] – 2026-05-16
+
+### Changed (AutoPrompt now generates proper Markdown instead of plain text)
+
+- AutoPrompt-generated translation prompts were saved as `.md` files but their content was plain text dressed up as a numbered list (`1. ROLE`, `2. TECHNICAL DOMAIN`, etc., with no Markdown headings, no bullet markers, no bold, no tables). The shared `prompt_library/` folder also held Workbench-generated prompts that *did* use proper Markdown (`## H2` headings, `-` bullets, `**bold**`, `| ... |` tables), so the two products were producing inconsistent artefacts in the same folder despite both using the same `.md` extension. Opening a Trados-generated prompt in Obsidian, VS Code, GitHub, or any Markdown-aware viewer rendered as a wall of text instead of a navigable document.
+- `PromptGenerator.BuildMetaPrompt` now contains an explicit Markdown-formatting block telling the LLM to: open with a `# H1` title and one or two `## H2` subtitles; render every major numbered section as a `## H2` heading; use `### H3` for subsections (e.g. `### Absolute requirements`, `### Absolute prohibitions`); use `-` bullet lists for enumerable content; use `**bold**` for emphasised and locked terms; render the PROJECT-SPECIFIC GLOSSARY as a proper Markdown table with header row + alignment row; use `---` horizontal rules between major sections; use fenced code blocks only for actual code/file-path examples.
+- The instruction explicitly notes that this Markdown requirement applies only to the **generated prompt itself**, not to the inner "OUTPUT FORMAT" rule that the generated prompt imposes on the translator AI (which still says "translation only, no markdown formatting in the translation output"). The two are different concerns – the prompt is a document for humans + LLMs to read; the translator's per-segment output remains plain target-text only.
+- Effect: next AutoPrompt-generated prompt opens cleanly in any Markdown viewer, is far easier to scan and edit (find Section 13 instantly via outline), and matches the format Supervertaler Workbench already produces. Pre-existing plain-text prompts continue to work unchanged – they're still valid system prompts for the translator AI.
+
+
 ## [4.19.109] – 2026-05-16
 
 ### Changed (Prompt manager: filename is now the authoritative display name)
