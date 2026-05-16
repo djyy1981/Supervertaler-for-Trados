@@ -1,5 +1,17 @@
 # Changelog
 
+## [4.19.111] – 2026-05-16
+
+### Changed (AutoPrompt-generated prompts now embed the Translator's Comment methodology by default)
+
+- Real translation work routinely runs into mechanical defects in the source: typos, broken words across whitespace, hanging mid-sentence breaks, doubled spaces, stray punctuation, reference-numeral mismatches that are unambiguous in context, missing diacritics. The cleanest workflow for handling these – established in a gold-standard project prompt and validated against real Trados Studio translation work – is for the translator AI to silently correct obvious defects and append a single concise translator's comment at the end of the segment in the form `⟦TC: short description of the fix⟧` (using the mathematical white square brackets U+27E6 / U+27E7, which do not occur in source documents and so are safe as out-of-band markers extractable in post-processing).
+- The Trados AutoPrompt meta-prompt (`PromptGenerator.BuildMetaPrompt`) now contains an explicit TRANSLATOR-COMMENT METHODOLOGY block that requires the LLM to embed this silent-correction-with-flagged-comment methodology in every prompt it generates, regardless of source language or domain. The block specifies the exact bracket characters, the rules for one-marker-per-segment, the no-empty-markers rule, the inline `[bracketed text]` convention for translator-supplied words, the comment-body style guidance (5–20 words, noun-phrase, no first-person), the placement (final content of the segment, single space separator), and a list of hard exclusions (numerical values, dates, dosages, claim language, statutory references, headings, identifiers, ambiguous cases).
+- The generated prompt is also required to include: (a) the silent-correction methodology in its TRANSLATION MANDATE section, with defect categories adapted to the actual source language (e.g. Dutch -d/-t typos, German missing umlauts, French accent slips, Spanish/Italian conjugation typos), (b) a dedicated TRANSLATOR COMMENT FORMAT section near the end with the exact spec and 4–6 example comment bodies adapted to the language and domain, (c) a check in PREFLIGHT SELF-CHECK and POST-TRANSLATION INTEGRITY that every silent correction has its corresponding marker and no segment without corrections has a marker, (d) a note in OUTPUT FORMAT that ⟦ and ⟧ are the deliberate out-of-band comment delimiter and the sole exception to the "ASCII output only" rule.
+- The methodology is always-on for every AutoPrompt-generated prompt in every domain – users who prefer not to use it can edit the generated prompt to remove the TC sections. Per-project opt-out via a UI toggle is a possible future enhancement.
+- The markers currently appear inline in the target text. Extraction into Trados Studio segment comments is not yet wired up; this is a separate follow-up. The current change ships the methodology in the prompts so the translator AI produces the markers reliably, ready for whichever extraction pipeline gets built next. The Trados Studio comment panel already exists, so the extraction step is small once the spec is locked.
+- Shipped in parallel with Supervertaler Workbench v1.10.46 which makes the same change to its Python meta-prompt so both products' AutoPrompts agree on the methodology and the bracket format.
+
+
 ## [4.19.110] – 2026-05-16
 
 ### Changed (AutoPrompt now generates proper Markdown instead of plain text)
