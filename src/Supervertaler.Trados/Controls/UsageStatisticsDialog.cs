@@ -20,7 +20,7 @@ namespace Supervertaler.Trados.Controls
     internal sealed class UsageStatisticsDialog : Form
     {
         private const string HelpUrl =
-            "https://supervertaler.gitbook.io/trados/settings/usage-statistics";
+            "https://help.supervertaler.com/trados/settings/usage-statistics/";
 
         public UsageStatisticsDialog()
         {
