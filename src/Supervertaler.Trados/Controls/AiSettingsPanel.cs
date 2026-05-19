@@ -1169,6 +1169,10 @@ namespace Supervertaler.Trados.Controls
                     disabledIds.Add(_availableTermbases[i].Id);
             }
             settings.DisabledAiTermbaseIds = disabledIds;
+            // Once the user has explicitly made a choice in the dialog, mark the
+            // global list as initialized so the opt-in auto-migration in the
+            // editor view part doesn't reset their selection on next startup.
+            settings.AiTermbaseIdsInitialized = true;
         }
 
         // ─── Event Handlers ──────────────────────────────────────────

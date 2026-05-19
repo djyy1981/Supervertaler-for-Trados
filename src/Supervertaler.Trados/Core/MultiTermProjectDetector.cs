@@ -10,13 +10,23 @@ using Supervertaler.Trados.Models;
 namespace Supervertaler.Trados.Core
 {
     /// <summary>
-    /// Detects MultiTerm .sdltb termbases attached to the active Trados project
-    /// and resolves language index mappings.
+    /// Detects file-based termbases attached to the active Trados project
+    /// and resolves language index mappings. Handles both legacy MultiTerm
+    /// .sdltb files (Trados Studio 2024) and the new SQLite-based .ttb files
+    /// (Trados Studio 2026). Downstream code dispatches on the file extension
+    /// to choose between MultiTermReader (OleDb) and TtbReader (SQLite).
     /// </summary>
     public static class MultiTermProjectDetector
     {
         /// <summary>
-        /// Enumerates MultiTerm .sdltb termbases from the active project's termbase
+        /// Termbase file extensions recognised by Trados Studio:
+        ///   .sdltb — legacy MultiTerm format (JET 4.0 / ACE OleDb, Trados Studio 2024 and earlier)
+        ///   .ttb   — new file-based termbase (SQLite 3 + FTS5, Trados Studio 2026)
+        /// </summary>
+        private static readonly string[] SupportedTermbaseExtensions = { ".sdltb", ".ttb" };
+
+        /// <summary>
+        /// Enumerates file-based termbases from the active project's termbase
         /// configuration and resolves source/target language index names.
         /// Returns empty list if no project is open or no termbases are configured.
         /// </summary>
@@ -107,8 +117,14 @@ namespace Supervertaler.Trados.Core
                         }
                         catch { }
 
-                        // Skip termbases disabled in Trados Project Settings
-                        if (!tb.Enabled) continue;
+                        // NB: we DO NOT skip termbases that the user has unchecked
+                        // in Trados Project Settings → Termbases. Many users want to
+                        // keep a termbase reference in the project but suppress
+                        // Trados's own native term-recognition (the red overlines
+                        // and Term Recognition pane), while still having the
+                        // termbase contribute to TermLens chips and AI prompts.
+                        // The plugin's own disable/enable lives in Supervertaler's
+                        // Termbases settings (`DisabledMultiTermIds`).
 
                         var localTb = tb as LocalTermbase;
                         if (localTb == null) continue;
@@ -117,7 +133,8 @@ namespace Supervertaler.Trados.Core
                         if (string.IsNullOrEmpty(filePath) || !File.Exists(filePath))
                             continue;
 
-                        if (!filePath.EndsWith(".sdltb", StringComparison.OrdinalIgnoreCase))
+                        if (!SupportedTermbaseExtensions.Any(ext =>
+                            filePath.EndsWith(ext, StringComparison.OrdinalIgnoreCase)))
                             continue;
 
                         var name = !string.IsNullOrEmpty(localTb.Name)

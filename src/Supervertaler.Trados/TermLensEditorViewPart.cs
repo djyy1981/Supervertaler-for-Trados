@@ -204,11 +204,34 @@ namespace Supervertaler.Trados
                 }
             }
 
-            // Load termbase: prefer saved setting, fall back to auto-detect
-            LoadTermbase();
-
-            // Load MultiTerm termbases from the active Trados project (if any)
-            LoadMultiTermTermbases();
+            // Load termbase + project .sdltb/.ttb termbases on a background
+            // thread so the editor view part can finish Initialize quickly and
+            // Studio's UI becomes responsive immediately. Cold-disk SQLite reads
+            // for 92K+ Supervertaler terms plus several project termbases take
+            // ~2 minutes on x64 Studio 2026; doing that synchronously blocked
+            // editor activation for the whole duration. After the background
+            // load completes, marshal a UI refresh so chips appear on whatever
+            // segment is currently active.
+            //
+            // While loading is in progress, _matcher is empty so segment clicks
+            // simply show no term chips yet — the user can still scroll, edit,
+            // and translate normally. UI updates inside the loaders (status
+            // label, MergeMultiTermEntries) already marshal to the UI thread.
+            System.Threading.Tasks.Task.Run(() =>
+            {
+                try
+                {
+                    LoadTermbase();
+                    LoadMultiTermTermbases();
+                    MigrateGlobalAiTermbaseListIfNeeded();
+                    SafeInvoke(UpdateFromActiveSegment);
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine(
+                        "[TermLens] Background termbase load failed: " + ex);
+                }
+            });
 
             // v4.19.113: wire the new ↻ refresh button in the TermLens
             // header to the same reload path F5 uses, and install a
@@ -338,7 +361,7 @@ namespace Supervertaler.Trados
 
                     try
                     {
-                        using (var reader = new MultiTermReader(config.FilePath))
+                        using (var reader = TermbaseReaderFactory.Create(config.FilePath))
                         {
                             if (reader.Open())
                             {
@@ -455,7 +478,10 @@ namespace Supervertaler.Trados
                                 {
                                     if (factory.SupportsTerminologyProviderUri(uri))
                                     {
-                                        provider = factory.CreateTerminologyProvider(uri, null);
+                                        // Use the single-argument overload — the two-argument
+                                        // (Uri, ITerminologyProviderCredentialStore) form is obsolete
+                                        // in Studio 2024 and removed in Studio 2026.
+                                        provider = factory.CreateTerminologyProvider(uri);
                                         if (provider != null) break;
                                     }
                                 }
@@ -965,16 +991,32 @@ namespace Supervertaler.Trados
                         // Apply shortcut style change
                         TermBlock.UseRepeatedDigitBadges = _settings.TermShortcutStyle == "repeated";
 
-                        // Force reload – the user may have toggled glossaries.
-                        LoadTermbase(forceReload: true);
-                        LoadMultiTermTermbases();
-                        UpdateFromActiveSegment();
-
                         // Refresh prompt library (user may have added/edited/deleted prompts)
                         _promptLibrary.Refresh();
 
                         // Notify AI Assistant to reload settings from disk
                         AiAssistantViewPart.NotifySettingsChanged();
+
+                        // Force-reload termbases on a background thread so the
+                        // dialog closes immediately and the UI stays responsive
+                        // while the reload (which can take ~2 min on Studio 2026
+                        // cold cache) runs. UpdateFromActiveSegment is marshaled
+                        // back to the UI thread when the reload finishes so
+                        // chips refresh on whatever segment is active by then.
+                        System.Threading.Tasks.Task.Run(() =>
+                        {
+                            try
+                            {
+                                LoadTermbase(forceReload: true);
+                                LoadMultiTermTermbases();
+                                SafeInvoke(UpdateFromActiveSegment);
+                            }
+                            catch (Exception ex)
+                            {
+                                System.Diagnostics.Debug.WriteLine(
+                                    "[TermLens] Post-settings reload failed: " + ex);
+                            }
+                        });
                     }
                 }
             });
@@ -1125,6 +1167,59 @@ namespace Supervertaler.Trados
         /// Opens the termbase database briefly and returns all termbase IDs.
         /// Used to pre-populate the disabled list when creating new project defaults.
         /// </summary>
+        /// <summary>
+        /// Opt-in default migration for the global AI-termbase inclusion list.
+        /// Old behaviour: empty DisabledAiTermbaseIds = "include all termbases in AI
+        /// prompts" — i.e. opt-out, which silently sends sensitive termbase contents
+        /// to the AI provider. New behaviour: opt-in — by default nothing is included,
+        /// the user explicitly enables specific termbases.
+        ///
+        /// This mirrors the per-project migration in OnActiveDocumentChanged: when the
+        /// initialized flag is false AND the disabled list is empty, populate the
+        /// disabled list with all known termbase IDs and set the flag. Users with any
+        /// existing explicit choices (non-empty disabled list) or already-migrated
+        /// settings (flag=true) are left untouched.
+        ///
+        /// Runs on the background termbase-load thread after termbase IDs are known.
+        /// </summary>
+        private void MigrateGlobalAiTermbaseListIfNeeded()
+        {
+            try
+            {
+                var ai = _settings?.AiSettings;
+                if (ai == null) return;
+                if (ai.AiTermbaseIdsInitialized) return;
+                if (ai.DisabledAiTermbaseIds != null && ai.DisabledAiTermbaseIds.Count > 0)
+                {
+                    // User has pre-existing explicit choices; just mark as initialized
+                    // so we don't keep re-evaluating on every load.
+                    ai.AiTermbaseIdsInitialized = true;
+                    _settings.Save();
+                    return;
+                }
+
+                var allIds = GetAllTermbaseIds(_settings.TermbasePath);
+                if (allIds == null || allIds.Count == 0)
+                {
+                    // No termbases loaded yet — don't migrate prematurely (we'd
+                    // mark as initialized with an empty list, defeating the
+                    // opt-in default on the next run). Try again next session.
+                    return;
+                }
+
+                ai.DisabledAiTermbaseIds = new List<long>(allIds);
+                ai.AiTermbaseIdsInitialized = true;
+                _settings.Save();
+                System.Diagnostics.Debug.WriteLine(
+                    $"[TermLens] Migrated global AI termbase list: disabled {allIds.Count} termbases (opt-in default)");
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine(
+                    "[TermLens] AI termbase migration failed: " + ex);
+            }
+        }
+
         private List<long> GetAllTermbaseIds(string termbasePath)
         {
             var dbPath = termbasePath;

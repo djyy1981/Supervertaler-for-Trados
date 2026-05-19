@@ -230,6 +230,7 @@ namespace Supervertaler.Trados.Controls
             _btnSettings.FlatAppearance.BorderSize = 0;
             _btnSettings.FlatAppearance.MouseOverBackColor = Color.FromArgb(220, 220, 220);
             _btnSettings.Click += (s, e) => SettingsRequested?.Invoke(this, EventArgs.Empty);
+            Core.ClickThrough.Attach(_btnSettings, () => SettingsRequested?.Invoke(this, EventArgs.Empty));
 
             // Help/about button (?) – floats to the left of the gear button
             _btnHelp = new Button
@@ -250,6 +251,7 @@ namespace Supervertaler.Trados.Controls
             _btnHelp.FlatAppearance.BorderSize = 0;
             _btnHelp.FlatAppearance.MouseOverBackColor = Color.FromArgb(220, 220, 220);
             _btnHelp.Click += OnHelpDropdown;
+            Core.ClickThrough.Attach(_btnHelp, OnHelpDropdown);
 
             Controls.Add(_btnSettings);
             Controls.Add(_btnHelp);
@@ -323,6 +325,7 @@ namespace Supervertaler.Trados.Controls
             btnChatFontUp.FlatAppearance.BorderSize = 0;
             btnChatFontUp.FlatAppearance.MouseOverBackColor = Color.FromArgb(220, 220, 220);
             btnChatFontUp.Click += OnChatFontIncrease;
+            Core.ClickThrough.Attach(btnChatFontUp, OnChatFontIncrease);
             fontButtonTip.SetToolTip(btnChatFontUp, "Increase chat font size");
 
             var btnChatFontDown = new Button
@@ -342,6 +345,7 @@ namespace Supervertaler.Trados.Controls
             btnChatFontDown.FlatAppearance.BorderSize = 0;
             btnChatFontDown.FlatAppearance.MouseOverBackColor = Color.FromArgb(220, 220, 220);
             btnChatFontDown.Click += OnChatFontDecrease;
+            Core.ClickThrough.Attach(btnChatFontDown, OnChatFontDecrease);
             fontButtonTip.SetToolTip(btnChatFontDown, "Decrease chat font size");
 
             // TableLayoutPanel: deterministic [col 0][col 1] ordering AND
@@ -471,6 +475,7 @@ namespace Supervertaler.Trados.Controls
             };
             _btnSend.FlatAppearance.BorderColor = Color.FromArgb(180, 200, 220);
             _btnSend.Click += (s, e) => DoSend();
+            Core.ClickThrough.Attach(_btnSend, () => DoSend());
 
             _btnStop = new Button
             {
@@ -490,6 +495,7 @@ namespace Supervertaler.Trados.Controls
             };
             _btnStop.FlatAppearance.BorderColor = Color.FromArgb(220, 180, 180);
             _btnStop.Click += (s, e) => StopRequested?.Invoke(this, EventArgs.Empty);
+            Core.ClickThrough.Attach(_btnStop, () => StopRequested?.Invoke(this, EventArgs.Empty));
 
             _btnClear = new Button
             {
@@ -509,6 +515,7 @@ namespace Supervertaler.Trados.Controls
             _btnClear.FlatAppearance.BorderSize = 0;
             _btnClear.FlatAppearance.MouseOverBackColor = Color.FromArgb(230, 230, 230);
             _btnClear.Click += (s, e) => ClearRequested?.Invoke(this, EventArgs.Empty);
+            Core.ClickThrough.Attach(_btnClear, () => ClearRequested?.Invoke(this, EventArgs.Empty));
 
             // Attach button for browsing files (images + documents)
             _btnAttach = new Button
@@ -528,6 +535,7 @@ namespace Supervertaler.Trados.Controls
             _btnAttach.FlatAppearance.BorderSize = 0;
             _btnAttach.FlatAppearance.MouseOverBackColor = Color.FromArgb(230, 230, 230);
             _btnAttach.Click += OnAttachClick;
+            Core.ClickThrough.Attach(_btnAttach, OnAttachClick);
 
             _lblStatus = new LinkLabel
             {

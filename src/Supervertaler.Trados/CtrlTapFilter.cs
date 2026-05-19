@@ -52,7 +52,11 @@ namespace Supervertaler.Trados
         public bool PreFilterMessage(ref Message m)
         {
             int msg = m.Msg;
-            int vk  = (int)m.WParam & 0xFF;
+            // m.WParam is IntPtr (64-bit under x64). Direct (int) cast throws
+            // OverflowException whenever WPARAM has any high bits set — common
+            // with system key events on x64. Read as Int64 first, then mask to
+            // the low byte (the virtual-key code) before narrowing.
+            int vk  = (int)(m.WParam.ToInt64() & 0xFF);
 
             // --- Key down ---
             if (msg == WM_KEYDOWN || msg == WM_SYSKEYDOWN)

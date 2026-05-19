@@ -148,6 +148,7 @@ namespace Supervertaler.Trados.Controls
             btnFontUp.FlatAppearance.BorderSize = 0;
             btnFontUp.FlatAppearance.MouseOverBackColor = Color.FromArgb(220, 220, 220);
             btnFontUp.Click += OnFontIncrease;
+            Core.ClickThrough.Attach(btnFontUp, OnFontIncrease);
             fontButtonTip.SetToolTip(btnFontUp, "Increase TermLens font size");
 
             var btnFontDown = new Button
@@ -167,6 +168,7 @@ namespace Supervertaler.Trados.Controls
             btnFontDown.FlatAppearance.BorderSize = 0;
             btnFontDown.FlatAppearance.MouseOverBackColor = Color.FromArgb(220, 220, 220);
             btnFontDown.Click += OnFontDecrease;
+            Core.ClickThrough.Attach(btnFontDown, OnFontDecrease);
             fontButtonTip.SetToolTip(btnFontDown, "Decrease TermLens font size");
 
             // TableLayoutPanel: deterministic [col 0][col 1] ordering AND
@@ -234,6 +236,7 @@ namespace Supervertaler.Trados.Controls
             _btnRefresh.FlatAppearance.BorderSize = 0;
             _btnRefresh.FlatAppearance.MouseOverBackColor = Color.FromArgb(220, 220, 220);
             _btnRefresh.Click += OnRefreshClicked;
+            Core.ClickThrough.Attach(_btnRefresh, OnRefreshClicked);
             fontButtonTip.SetToolTip(_btnRefresh,
                 "Refresh termbases from disk (F5)\n" +
                 "\n" +
@@ -290,7 +293,7 @@ namespace Supervertaler.Trados.Controls
 
             if (!_reader.Open())
             {
-                _statusLabel.Text = "Failed to open termbase";
+                SetStatusLabel("Failed to open termbase");
                 return false;
             }
 
@@ -309,12 +312,30 @@ namespace Supervertaler.Trados.Controls
                     totalTerms += tb.TermCount;
                 }
             }
-            _statusLabel.Text = enabledCount == termbases.Count
+            SetStatusLabel(enabledCount == termbases.Count
                 ? $"{termbases.Count} termbases, {totalTerms} terms"
-                : $"{enabledCount}/{termbases.Count} termbases, {totalTerms} terms";
+                : $"{enabledCount}/{termbases.Count} termbases, {totalTerms} terms");
             _currentDbPath = dbPath;
 
             return true;
+        }
+
+        // Thread-safe status-label setter. LoadTermbase() is now called from a
+        // background Task during plugin initialization (so editor activation
+        // isn't blocked by 2 min of cold-SQLite reads on x64 Studio 2026).
+        // Touching _statusLabel.Text from a worker thread would throw on debug
+        // builds and is undefined behaviour on release; marshal via Invoke.
+        private void SetStatusLabel(string text)
+        {
+            if (_statusLabel == null) return;
+            if (_statusLabel.InvokeRequired)
+            {
+                try { _statusLabel.BeginInvoke(new Action<string>(SetStatusLabel), text); } catch { }
+            }
+            else
+            {
+                _statusLabel.Text = text;
+            }
         }
 
         /// <summary>

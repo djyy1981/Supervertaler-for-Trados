@@ -166,20 +166,21 @@ def read_version_from_csproj(build_dir):
     return ".".join(parts[:4])
 
 
-def build_manifest_xml(version):
-    """Build pluginpackage.manifest.xml with Include section for extra files."""
-    include_lines = "\n".join(f"    <File>{f}</File>" for f in INCLUDE_FILES)
-    return f"""<?xml version="1.0" encoding="utf-8"?>
-<PluginPackage xmlns="http://www.sdl.com/Plugins/PluginPackage/1.0">
-  <PlugInName>Supervertaler for Trados</PlugInName>
-  <Version>{version}</Version>
-  <Description>Terminology display and AI translation for Trados Studio by Supervertaler.</Description>
-  <Author>Michael Beijer</Author>
-  <RequiredProduct name="TradosStudio" minversion="18.0" maxversion="18.9" />
-  <Include>
-{include_lines}
-  </Include>
-</PluginPackage>"""
+def read_manifest_from_build_dir(build_dir):
+    """Read the pluginpackage.manifest.xml from the build output directory.
+
+    The MSBuild CopyPluginManifest target writes the per-Studio-version manifest
+    (18 vs 19) there; we ship whatever the build produced verbatim instead of
+    regenerating from a hardcoded template — otherwise the dual-build setup
+    silently regresses to Studio 18 RequiredProduct constraints.
+    """
+    src = os.path.join(build_dir, "pluginpackage.manifest.xml")
+    if not os.path.exists(src):
+        print(f"ERROR: Manifest not found in build output: {src}")
+        print("       Did the CopyPluginManifest MSBuild target run?")
+        sys.exit(1)
+    with open(src, "r", encoding="utf-8-sig") as f:
+        return f.read()
 
 
 def main():
@@ -197,7 +198,7 @@ def main():
             print(f"ERROR: Missing file: {path}")
             sys.exit(1)
 
-    # Read version from .csproj for the manifest
+    # Read version from .csproj (for the log line only — manifest comes from build output)
     version = read_version_from_csproj(build_dir)
     print(f"Creating OPC package: {output_path} (version {version})")
 
@@ -208,10 +209,12 @@ def main():
             zf.write(src, f)
             print(f"  + {f} ({os.path.getsize(src):,} bytes)")
 
-        # 2. Write pluginpackage.manifest.xml (generated, not from build output)
-        manifest = build_manifest_xml(version)
+        # 2. Write pluginpackage.manifest.xml (taken verbatim from the build
+        #    output — this is how the Studio 18 vs Studio 19 RequiredProduct
+        #    constraints get applied to the right package).
+        manifest = read_manifest_from_build_dir(build_dir)
         zf.writestr("pluginpackage.manifest.xml", manifest.encode("utf-8"))
-        print(f"  + pluginpackage.manifest.xml (generated)")
+        print(f"  + pluginpackage.manifest.xml (from build output)")
 
         # 3. Write [Content_Types].xml
         all_files = PLUGIN_FILES + ["pluginpackage.manifest.xml"]

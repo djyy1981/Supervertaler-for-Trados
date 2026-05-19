@@ -99,9 +99,26 @@ namespace Supervertaler.Trados.Settings
         /// IDs of termbases disabled for AI context.
         /// Empty means all termbases contribute to AI prompts.
         /// Separate from TermLensSettings.DisabledTermbaseIds (which controls TermLens display).
+        ///
+        /// NB: The privacy-first default is opt-in (nothing included). That is achieved
+        /// at first load via the AiTermbaseIdsInitialized flag below: when the flag is
+        /// false and this list is empty, the editor migrates by populating this list
+        /// with ALL currently-known termbase IDs (effectively disabling everything),
+        /// then sets the flag. Existing users with explicit choices (any non-empty list)
+        /// or who have already been migrated (flag=true) keep their state untouched.
         /// </summary>
         [DataMember(Name = "disabledAiTermbaseIds")]
         public List<long> DisabledAiTermbaseIds { get; set; } = new List<long>();
+
+        /// <summary>
+        /// One-shot migration marker for the opt-in AI termbase default.
+        /// false (default for files that pre-date this field) = needs migration.
+        /// true = either already migrated, or the user has explicitly chosen their
+        /// preferences via the AI Settings dialog. Mirror of ProjectSettings'
+        /// per-project flag of the same name, applied at the global level.
+        /// </summary>
+        [DataMember(Name = "aiTermbaseIdsInitialized")]
+        public bool AiTermbaseIdsInitialized { get; set; }
 
         /// <summary>
         /// Whether to include TM (Translation Memory) fuzzy matches in AI context.

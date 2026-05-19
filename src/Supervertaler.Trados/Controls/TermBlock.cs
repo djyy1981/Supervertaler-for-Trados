@@ -279,7 +279,21 @@ namespace Supervertaler.Trados.Controls
                 if (_shortcutIndex >= 0)
                     badgeWidth = GetBadgeWidth(g) + 4;
 
-                int targetRowWidth = (int)Math.Ceiling(targetSize.Width) + extraWidth + badgeWidth + 10;
+                // The metadata dot / synonym icon are drawn at the top-right corner
+                // of the target rectangle, centred on its right edge, so they extend
+                // ~half their size plus a white border (≈6px) PAST targetRect.Right.
+                // Reserve that overflow in the chip width so the corner indicators
+                // aren't clipped on the right (which visually reads as the dot/icon
+                // being "cut off" at the top-right). Only reserve it when an
+                // indicator is actually present, to avoid widening every chip.
+                bool hasCornerIndicator = _entries.Any(t =>
+                    !string.IsNullOrEmpty(t.Definition) || !string.IsNullOrEmpty(t.Domain) ||
+                    !string.IsNullOrEmpty(t.Notes) || !string.IsNullOrEmpty(t.Url) ||
+                    (t.TargetSynonyms != null && t.TargetSynonyms.Count > 0) ||
+                    (t.SourceSynonyms != null && t.SourceSynonyms.Count > 0));
+                int indicatorReserve = hasCornerIndicator ? UiScale.Pixels(7) : 0;
+
+                int targetRowWidth = (int)Math.Ceiling(targetSize.Width) + extraWidth + badgeWidth + 10 + indicatorReserve;
                 int width = (int)Math.Ceiling(Math.Max(sourceSize.Width + 10, targetRowWidth));
                 if (MaxWidth > 0 && width > MaxWidth)
                     width = MaxWidth;

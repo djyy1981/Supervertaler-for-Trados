@@ -5,8 +5,8 @@
     <UseWindowsForms>true</UseWindowsForms>
     <RootNamespace>Supervertaler.Trados</RootNamespace>
     <AssemblyName>Supervertaler.Trados</AssemblyName>
-    <Version>4.19.114</Version>
-    <InformationalVersion>4.19.114</InformationalVersion>
+    <Version>4.20.0</Version>
+    <InformationalVersion>4.20.0</InformationalVersion>
     <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
     <Authors>Michael Beijer</Authors>
     <Company>Supervertaler</Company>
@@ -18,9 +18,29 @@
     <AssemblyOriginatorKeyFile>Supervertaler.Trados.snk</AssemblyOriginatorKeyFile>
   </PropertyGroup>
 
-  <!-- Trados Studio 2024 (Studio18) DLL references from local installation -->
+  <!--
+    Trados Studio target selection. Pass /p:TradosStudioVersion=18 (default,
+    Trados Studio 2024) or /p:TradosStudioVersion=19 (Trados Studio 2026).
+    The 18 build is x86/AnyCPU and uses JET OleDb for .sdltb termbases.
+    The 19 build is x64-only and uses SQLite for .ttb termbases — Studio 2026
+    is a 64-bit application and dropped the MultiTerm install.
+  -->
   <PropertyGroup>
+    <TradosStudioVersion Condition="'$(TradosStudioVersion)' == ''">18</TradosStudioVersion>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(TradosStudioVersion)' == '18'">
     <TradosStudioPath>C:\Program Files (x86)\Trados\Trados Studio\Studio18</TradosStudioPath>
+    <PluginManifestFile>pluginpackage.manifest.xml</PluginManifestFile>
+    <BaseOutputPath>bin\Studio18\</BaseOutputPath>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(TradosStudioVersion)' == '19'">
+    <TradosStudioPath>C:\Program Files\Trados\Trados Studio\Studio19Beta</TradosStudioPath>
+    <PluginManifestFile>pluginpackage.manifest.19.xml</PluginManifestFile>
+    <PlatformTarget>x64</PlatformTarget>
+    <BaseOutputPath>bin\Studio19\</BaseOutputPath>
+    <DefineConstants>$(DefineConstants);STUDIO19</DefineConstants>
   </PropertyGroup>
 
   <ItemGroup>
@@ -85,7 +105,7 @@
     <Reference Include="System.IO.Compression" />
   </ItemGroup>
 
-  <!-- SQLite for reading Supervertaler termbases -->
+  <!-- SQLite for reading Supervertaler termbases (and .ttb in Studio 2026) -->
   <!-- Using Microsoft.Data.Sqlite instead of System.Data.SQLite to avoid
        native interop DLL hash mismatches in Trados Studio's plugin environment.
        Microsoft.Data.Sqlite uses SQLitePCLRaw with "e_sqlite3.dll" (not
@@ -105,14 +125,20 @@
     <PackageReference Include="System.Runtime.CompilerServices.Unsafe" Version="6.0.0" />
   </ItemGroup>
 
-  <!-- Plugin package manifest and extension manifest -->
+  <!-- Plugin extension manifest. -->
   <ItemGroup>
-    <None Include="pluginpackage.manifest.xml">
-      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-    </None>
     <None Include="Supervertaler.Trados.plugin.xml">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
+  </ItemGroup>
+
+  <!-- Mark both manifest variants as "None" so they show up in the IDE and are
+       tracked by source control, but DO NOT copy them automatically — Trados
+       requires the output to be named exactly pluginpackage.manifest.xml, and
+       a per-build Copy target below selects the right source file. -->
+  <ItemGroup>
+    <None Include="pluginpackage.manifest.xml" />
+    <None Include="pluginpackage.manifest.19.xml" />
   </ItemGroup>
 
   <!-- Plugin resources — rename to Supervertaler.Trados.plugin.resources for Trados plugin framework -->
@@ -146,6 +172,22 @@
   <!-- Copy compiled .plugin.resources sidecar to output (needed by Trados plugin framework) -->
   <Target Name="CopyPluginResources" AfterTargets="Build">
     <Copy SourceFiles="$(IntermediateOutputPath)Supervertaler.Trados.plugin.resources" DestinationFolder="$(OutputPath)" SkipUnchangedFiles="true" />
+  </Target>
+
+  <!-- Copy the version-appropriate manifest as pluginpackage.manifest.xml.
+       Trados Studio's loader recognises that exact filename only. -->
+  <Target Name="CopyPluginManifest" AfterTargets="Build">
+    <Copy SourceFiles="$(MSBuildThisFileDirectory)$(PluginManifestFile)"
+          DestinationFiles="$(OutputPath)pluginpackage.manifest.xml" />
+  </Target>
+
+  <!-- Studio 19 build: rewrite plugin.xml extension-attribute Sdl.* assembly
+       references from Version=18.0.0.0 to 19.0.0.0 in the output copy. The
+       source plugin.xml stays canonical (18 refs); we patch the build artefact. -->
+  <Target Name="PatchPluginXmlForStudio19"
+          AfterTargets="CopyPluginResources"
+          Condition="'$(TradosStudioVersion)' == '19'">
+    <Exec Command="python &quot;$(MSBuildThisFileDirectory)..\..\tools\patch_plugin_xml_for_studio19.py&quot; &quot;$(OutputPath)Supervertaler.Trados.plugin.xml&quot;" />
   </Target>
 
 </Project>

@@ -50,6 +50,9 @@ namespace Supervertaler.Trados.Controls
             _btnSettings.FlatAppearance.BorderSize = 0;
             _btnSettings.FlatAppearance.MouseOverBackColor = Color.FromArgb(220, 220, 220);
             _btnSettings.Click += (s, e) => SettingsRequested?.Invoke(this, EventArgs.Empty);
+            // Studio 2026 first-click-eaten workaround — see Core/ClickThrough.cs.
+            Core.ClickThrough.Attach(_btnSettings,
+                () => SettingsRequested?.Invoke(this, EventArgs.Empty));
 
             // Help/about button (?) – floats to the left of the gear button
             _btnHelp = new Button
@@ -70,6 +73,7 @@ namespace Supervertaler.Trados.Controls
             _btnHelp.FlatAppearance.BorderSize = 0;
             _btnHelp.FlatAppearance.MouseOverBackColor = Color.FromArgb(220, 220, 220);
             _btnHelp.Click += OnHelpDropdown;
+            Core.ClickThrough.Attach(_btnHelp, () => OnHelpDropdown(_btnHelp, EventArgs.Empty));
 
             Controls.Add(_btnSettings);
             Controls.Add(_btnHelp);
@@ -89,6 +93,23 @@ namespace Supervertaler.Trados.Controls
             // Help "?" at far right, gear to its left
             _btnHelp.Location = new Point(Width - _btnHelp.Width - 2, 1);
             _btnSettings.Location = new Point(_btnHelp.Left - _btnSettings.Width, 1);
+        }
+
+        // Force MA_ACTIVATE on WM_MOUSEACTIVATE — default per Win32 docs but
+        // Trados 2026's WPF docking host appears to return something that ends
+        // up consuming the LBUTTONDOWN. The override below is harmless when
+        // already MA_ACTIVATE; it's the GotFocus-synthesis above that actually
+        // fixes the symptom on 2026.
+        protected override void WndProc(ref Message m)
+        {
+            const int WM_MOUSEACTIVATE = 0x21;
+            const int MA_ACTIVATE = 1;
+            if (m.Msg == WM_MOUSEACTIVATE)
+            {
+                m.Result = (IntPtr)MA_ACTIVATE;
+                return;
+            }
+            base.WndProc(ref m);
         }
 
         private void OnHelpDropdown(object sender, EventArgs e)

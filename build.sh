@@ -1,37 +1,66 @@
 #!/bin/bash
 # Build, package, and deploy Supervertaler for Trados.
+# Produces TWO .sdlplugin artefacts from one source tree:
+#   - Studio 2024 (Studio18): x86, .sdltb via JET OleDb
+#   - Studio 2026 (Studio19): x64, .ttb via SQLite
+# The Studio 19 build is skipped if Studio19Beta is not installed on this machine.
 # Trados Studio must be CLOSED before running this script.
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_DIR="$SCRIPT_DIR/src/Supervertaler.Trados"
 DIST_DIR="$SCRIPT_DIR/dist"
-BUILD_DIR="$PROJECT_DIR/bin/Release"
 DOTNET="${HOME}/.dotnet/dotnet"
 
-PACKAGES_DIR="$LOCALAPPDATA/Trados/Trados Studio/18/Plugins/Packages"
-UNPACKED_DIR="$LOCALAPPDATA/Trados/Trados Studio/18/Plugins/Unpacked/Supervertaler for Trados"
-OLD_UNPACKED_DIR="$LOCALAPPDATA/Trados/Trados Studio/18/Plugins/Unpacked/TermLens"
+STUDIO18_INSTALL="/c/Program Files (x86)/Trados/Trados Studio/Studio18"
+STUDIO19_INSTALL="/c/Program Files/Trados/Trados Studio/Studio19Beta"
 
-# Also clean up old Roaming install location if present (build.sh used to
-# deploy to Roaming; switched to Local in v4.19.25 to match the install scope
-# end-users get from the recommended "This computer for me only" option in
-# the Trados Plugin Installer).
-OLD_ROAMING_PACKAGES="$APPDATA/Trados/Trados Studio/18/Plugins/Packages"
-OLD_ROAMING_UNPACKED="$APPDATA/Trados/Trados Studio/18/Plugins/Unpacked/Supervertaler for Trados"
+BUILD_DIR_18="$PROJECT_DIR/bin/Studio18/Release"
+BUILD_DIR_19="$PROJECT_DIR/bin/Studio19/Release"
+
+PACKAGES_DIR_18="$LOCALAPPDATA/Trados/Trados Studio/18/Plugins/Packages"
+UNPACKED_DIR_18="$LOCALAPPDATA/Trados/Trados Studio/18/Plugins/Unpacked/Supervertaler for Trados"
+# Studio 2026 Beta uses the "19beta" version key (not "19") and ships its bundled
+# plugins (LanguageWeaver Provider, OpenAI Provider for Trados Studio) in Roaming
+# rather than Local. We deploy to Roaming\19beta to match where the beta actually
+# looks. The matching "stale plugin" cleanups below also clear any leftover Local
+# \19 or Local\19beta copies a previous build.sh attempt may have left behind.
+PACKAGES_DIR_19="$APPDATA/Trados/Trados Studio/19beta/Plugins/Packages"
+# Studio extracts to Unpacked/<sdlplugin-filename-without-extension>/, NOT to
+# Unpacked/<PlugInName>/. So for "Supervertaler for Trados (Studio 2026).sdlplugin"
+# the extracted folder is "Supervertaler for Trados (Studio 2026)" (with suffix).
+# Targeting the wrong name leaves the old DLL in place; Studio re-loads it
+# without re-extracting from the new .sdlplugin and we keep seeing stale crashes.
+UNPACKED_DIR_19="$APPDATA/Trados/Trados Studio/19beta/Plugins/Unpacked/Supervertaler for Trados (Studio 2026)"
+STALE_LOCAL_19_DIR="$LOCALAPPDATA/Trados/Trados Studio/19/Plugins/Packages"
+STALE_LOCAL_19BETA_DIR="$LOCALAPPDATA/Trados/Trados Studio/19beta/Plugins/Packages"
+STALE_LOCAL_19_UNPACKED="$LOCALAPPDATA/Trados/Trados Studio/19/Plugins/Unpacked/Supervertaler for Trados (Studio 2026)"
+STALE_LOCAL_19BETA_UNPACKED="$LOCALAPPDATA/Trados/Trados Studio/19beta/Plugins/Unpacked/Supervertaler for Trados (Studio 2026)"
+
+OLD_UNPACKED_DIR_18="$LOCALAPPDATA/Trados/Trados Studio/18/Plugins/Unpacked/TermLens"
+# build.sh used to deploy to Roaming; switched to Local in v4.19.25 to match
+# the install scope end-users get from "This computer for me only" in the
+# Trados Plugin Installer.
+OLD_ROAMING_PACKAGES_18="$APPDATA/Trados/Trados Studio/18/Plugins/Packages"
+OLD_ROAMING_UNPACKED_18="$APPDATA/Trados/Trados Studio/18/Plugins/Unpacked/Supervertaler for Trados"
+
+PLUGIN_FILENAME_18="Supervertaler for Trados.sdlplugin"
+PLUGIN_FILENAME_19="Supervertaler for Trados (Studio 2026).sdlplugin"
 
 # Verify all version files are in sync before building.
 CSPROJ_VER=$(sed -n 's/.*<Version>\([0-9.]*\)<\/Version>.*/\1/p' "$PROJECT_DIR/Supervertaler.Trados.csproj" | head -1)
 MANIFEST_VER=$(sed -n 's/.*<Version>\([0-9.]*\)<\/Version>.*/\1/p' "$PROJECT_DIR/pluginpackage.manifest.xml")
+MANIFEST_VER_19=$(sed -n 's/.*<Version>\([0-9.]*\)<\/Version>.*/\1/p' "$PROJECT_DIR/pluginpackage.manifest.19.xml")
 PLUGIN_VER=$(python "$SCRIPT_DIR/tools/read_plugin_version.py" "$PROJECT_DIR/Supervertaler.Trados.plugin.xml" 2>/dev/null || echo "?")
 
 CSPROJ_FOUR="${CSPROJ_VER}.0"
-if [ "$CSPROJ_FOUR" != "$MANIFEST_VER" ] || [ "$CSPROJ_FOUR" != "$PLUGIN_VER" ]; then
+if [ "$CSPROJ_FOUR" != "$MANIFEST_VER" ] || [ "$CSPROJ_FOUR" != "$MANIFEST_VER_19" ] || [ "$CSPROJ_FOUR" != "$PLUGIN_VER" ]; then
     echo ""
     echo "  ERROR: Version mismatch detected!"
-    echo "    .csproj:  $CSPROJ_VER ($CSPROJ_FOUR)"
-    echo "    manifest: $MANIFEST_VER"
-    echo "    plugin:   $PLUGIN_VER"
+    echo "    .csproj:     $CSPROJ_VER ($CSPROJ_FOUR)"
+    echo "    manifest 18: $MANIFEST_VER"
+    echo "    manifest 19: $MANIFEST_VER_19"
+    echo "    plugin.xml:  $PLUGIN_VER"
     echo ""
     echo "  Run: python bump_version.py $CSPROJ_VER"
     echo ""
@@ -40,99 +69,152 @@ fi
 echo "  Version check passed: $CSPROJ_FOUR"
 echo ""
 
-echo "=== Building Supervertaler for Trados ==="
-"$DOTNET" build "$PROJECT_DIR/Supervertaler.Trados.csproj" -c Release
-
-# Ensure ARM64 native SQLite binary is in the build output.
-# NuGet restore downloads it but MSBuild only copies x64/x86/arm to the output.
-# Needed for Windows on ARM (Parallels on Apple Silicon, Surface Pro X, etc.).
-ARM64_SRC="$USERPROFILE/.nuget/packages/sqlitepclraw.lib.e_sqlite3/2.1.6/runtimes/win-arm64/native/e_sqlite3.dll"
-ARM64_DST="$BUILD_DIR/runtimes/win-arm64/native"
-if [ -f "$ARM64_SRC" ] && [ ! -f "$ARM64_DST/e_sqlite3.dll" ]; then
-    echo "  Copying win-arm64 native e_sqlite3.dll..."
-    mkdir -p "$ARM64_DST"
-    cp "$ARM64_SRC" "$ARM64_DST/e_sqlite3.dll"
-fi
-
-echo ""
-PLUGIN_FILENAME="Supervertaler for Trados.sdlplugin"
-echo "=== Packaging $PLUGIN_FILENAME (OPC format) ==="
-mkdir -p "$DIST_DIR"
-rm -f "$DIST_DIR/$PLUGIN_FILENAME"
-python "$SCRIPT_DIR/package_plugin.py" "$BUILD_DIR" "$DIST_DIR/$PLUGIN_FILENAME"
-
-# Mirror the .sdlplugin into RWS AppStore/ so the AppStore Manager
-# upload step has both the plugin and that version's release notes
-# in one folder for drag-and-drop. The release notes themselves are
-# written to that folder by tools/appstore_release.py earlier.
-APPSTORE_DIR="$SCRIPT_DIR/RWS AppStore"
-mkdir -p "$APPSTORE_DIR"
-cp "$DIST_DIR/$PLUGIN_FILENAME" "$APPSTORE_DIR/$PLUGIN_FILENAME"
-echo "  Mirrored to: $APPSTORE_DIR/$PLUGIN_FILENAME"
-
-echo ""
-echo "=== Deploying to Trados Studio ==="
-
 # Abort if Trados Studio is running — it locks plugin files and prevents
 # a clean extraction on next start, leaving the plugin in a broken state.
 if tasklist.exe 2>/dev/null | grep -qi "SDLTradosStudio\|TradosStudio"; then
     echo ""
     echo "  ERROR: Trados Studio is currently running."
     echo "  Close Trados Studio completely, then run this script again."
-    echo ""
-    echo "  (The plugin was built and packaged successfully — only the deploy step was skipped.)"
     exit 1
 fi
 
-# Wipe the Unpacked folder so Trados re-extracts cleanly on next start.
-if [ -d "$UNPACKED_DIR" ]; then
-    echo "  Removing stale Unpacked/Supervertaler for Trados..."
-    rm -rf "$UNPACKED_DIR"
-    echo "  Unpacked folder cleaned."
+# ============================================================================
+#  Studio 18 build (Trados Studio 2024)
+# ============================================================================
+if [ -d "$STUDIO18_INSTALL" ]; then
+    echo "=== [Studio18] Building Supervertaler for Trados 2024 ==="
+    "$DOTNET" build "$PROJECT_DIR/Supervertaler.Trados.csproj" -c Release -p:TradosStudioVersion=18
+
+    # Ensure ARM64 native SQLite binary is in the build output.
+    # NuGet restore downloads it but MSBuild only copies x64/x86/arm to the output.
+    # Needed for Windows on ARM (Parallels on Apple Silicon, Surface Pro X, etc.).
+    ARM64_SRC="$USERPROFILE/.nuget/packages/sqlitepclraw.lib.e_sqlite3/2.1.6/runtimes/win-arm64/native/e_sqlite3.dll"
+    ARM64_DST_18="$BUILD_DIR_18/runtimes/win-arm64/native"
+    if [ -f "$ARM64_SRC" ] && [ ! -f "$ARM64_DST_18/e_sqlite3.dll" ]; then
+        echo "  Copying win-arm64 native e_sqlite3.dll..."
+        mkdir -p "$ARM64_DST_18"
+        cp "$ARM64_SRC" "$ARM64_DST_18/e_sqlite3.dll"
+    fi
+
+    echo ""
+    echo "=== [Studio18] Packaging $PLUGIN_FILENAME_18 (OPC format) ==="
+    mkdir -p "$DIST_DIR"
+    rm -f "$DIST_DIR/$PLUGIN_FILENAME_18"
+    python "$SCRIPT_DIR/package_plugin.py" "$BUILD_DIR_18" "$DIST_DIR/$PLUGIN_FILENAME_18"
+
+    # Mirror the .sdlplugin into RWS AppStore/ so the AppStore Manager upload step
+    # has both the plugin and that version's release notes in one folder.
+    APPSTORE_DIR="$SCRIPT_DIR/RWS AppStore"
+    mkdir -p "$APPSTORE_DIR"
+    cp "$DIST_DIR/$PLUGIN_FILENAME_18" "$APPSTORE_DIR/$PLUGIN_FILENAME_18"
+    echo "  Mirrored to: $APPSTORE_DIR/$PLUGIN_FILENAME_18"
+    echo ""
+
+    echo "=== [Studio18] Deploying to Trados Studio 2024 ==="
+
+    # Wipe the Unpacked folder so Trados re-extracts cleanly on next start.
+    if [ -d "$UNPACKED_DIR_18" ]; then
+        echo "  Removing stale Unpacked/Supervertaler for Trados..."
+        rm -rf "$UNPACKED_DIR_18"
+    fi
+    if [ -d "$OLD_UNPACKED_DIR_18" ]; then
+        echo "  Removing old Unpacked/TermLens..."
+        rm -rf "$OLD_UNPACKED_DIR_18"
+    fi
+
+    # Clean up old Roaming install location (build.sh used to deploy here before
+    # switching to Local in v4.19.25).
+    if [ -f "$OLD_ROAMING_PACKAGES_18/$PLUGIN_FILENAME_18" ]; then
+        echo "  Removing old Roaming Packages/$PLUGIN_FILENAME_18..."
+        rm -f "$OLD_ROAMING_PACKAGES_18/$PLUGIN_FILENAME_18"
+    fi
+    if [ -d "$OLD_ROAMING_UNPACKED_18" ]; then
+        echo "  Removing old Roaming Unpacked/Supervertaler for Trados..."
+        rm -rf "$OLD_ROAMING_UNPACKED_18"
+    fi
+
+    # Remove obsolete package names that may still be in Packages.
+    for OLD_PKG in "TermLens.sdlplugin" "Supervertaler.Trados.sdlplugin"; do
+        if [ -f "$PACKAGES_DIR_18/$OLD_PKG" ]; then
+            echo "  Removing old $OLD_PKG..."
+            rm -f "$PACKAGES_DIR_18/$OLD_PKG"
+        fi
+    done
+    OLD_DOTTED_UNPACKED_18="$APPDATA/Trados/Trados Studio/18/Plugins/Unpacked/Supervertaler.Trados"
+    if [ -d "$OLD_DOTTED_UNPACKED_18" ]; then
+        echo "  Removing old Unpacked/Supervertaler.Trados..."
+        rm -rf "$OLD_DOTTED_UNPACKED_18"
+    fi
+
+    mkdir -p "$PACKAGES_DIR_18"
+    cp "$DIST_DIR/$PLUGIN_FILENAME_18" "$PACKAGES_DIR_18/$PLUGIN_FILENAME_18"
+    echo "  Installed: $PACKAGES_DIR_18/$PLUGIN_FILENAME_18"
+    echo ""
+else
+    echo "  [Studio18] Trados Studio 2024 not installed at $STUDIO18_INSTALL — skipping 18 build."
+    echo ""
 fi
 
-# Clean up old TermLens unpacked directory if it exists
-if [ -d "$OLD_UNPACKED_DIR" ]; then
-    echo "  Removing old Unpacked/TermLens..."
-    rm -rf "$OLD_UNPACKED_DIR"
-    echo "  Old TermLens folder cleaned."
+# ============================================================================
+#  Studio 19 build (Trados Studio 2026)
+# ============================================================================
+if [ -d "$STUDIO19_INSTALL" ]; then
+    echo "=== [Studio19] Building Supervertaler for Trados 2026 ==="
+    "$DOTNET" build "$PROJECT_DIR/Supervertaler.Trados.csproj" -c Release -p:TradosStudioVersion=19
+
+    ARM64_DST_19="$BUILD_DIR_19/runtimes/win-arm64/native"
+    if [ -f "$ARM64_SRC" ] && [ ! -f "$ARM64_DST_19/e_sqlite3.dll" ]; then
+        echo "  Copying win-arm64 native e_sqlite3.dll..."
+        mkdir -p "$ARM64_DST_19"
+        cp "$ARM64_SRC" "$ARM64_DST_19/e_sqlite3.dll"
+    fi
+
+    echo ""
+    echo "=== [Studio19] Packaging $PLUGIN_FILENAME_19 (OPC format) ==="
+    mkdir -p "$DIST_DIR"
+    rm -f "$DIST_DIR/$PLUGIN_FILENAME_19"
+    python "$SCRIPT_DIR/package_plugin.py" "$BUILD_DIR_19" "$DIST_DIR/$PLUGIN_FILENAME_19"
+
+    APPSTORE_DIR="$SCRIPT_DIR/RWS AppStore"
+    mkdir -p "$APPSTORE_DIR"
+    cp "$DIST_DIR/$PLUGIN_FILENAME_19" "$APPSTORE_DIR/$PLUGIN_FILENAME_19"
+    echo "  Mirrored to: $APPSTORE_DIR/$PLUGIN_FILENAME_19"
+    echo ""
+
+    echo "=== [Studio19] Deploying to Trados Studio 2026 ==="
+
+    # Clean any stale Supervertaler copies in the wrong 2026-era folders. Earlier
+    # versions of build.sh deployed to %LocalAppData%\...\19\ (no "beta" suffix),
+    # which Studio 2026 doesn't read; left there those files just confuse later
+    # diagnoses.
+    for STALE_DIR in "$STALE_LOCAL_19_DIR" "$STALE_LOCAL_19BETA_DIR"; do
+        for STALE_FILE in "$STALE_DIR"/Supervertaler*.sdlplugin; do
+            [ -e "$STALE_FILE" ] || continue
+            echo "  Removing stale: $STALE_FILE"
+            rm -f "$STALE_FILE"
+        done
+    done
+    for STALE_UNPACKED in "$STALE_LOCAL_19_UNPACKED" "$STALE_LOCAL_19BETA_UNPACKED"; do
+        if [ -d "$STALE_UNPACKED" ]; then
+            echo "  Removing stale Unpacked: $STALE_UNPACKED"
+            rm -rf "$STALE_UNPACKED"
+        fi
+    done
+
+    # Wipe the live Unpacked folder so Studio 2026 re-extracts cleanly on next start.
+    if [ -d "$UNPACKED_DIR_19" ]; then
+        echo "  Removing stale Unpacked/Supervertaler for Trados in Roaming\\19beta..."
+        rm -rf "$UNPACKED_DIR_19"
+    fi
+
+    mkdir -p "$PACKAGES_DIR_19"
+    cp "$DIST_DIR/$PLUGIN_FILENAME_19" "$PACKAGES_DIR_19/$PLUGIN_FILENAME_19"
+    echo "  Installed: $PACKAGES_DIR_19/$PLUGIN_FILENAME_19"
+    echo ""
+else
+    echo "  [Studio19] Trados Studio 2026 Beta not installed at $STUDIO19_INSTALL — skipping 19 build."
+    echo "  Install Studio 2026 to ${STUDIO19_INSTALL/\/c\//C:\\} to enable the 19 build."
+    echo ""
 fi
 
-# Clean up old Roaming install location (build.sh used to deploy here before
-# switching to Local in v4.19.25; remove any spaced-name .sdlplugin and its
-# Unpacked folder so HandlePendingUpdate doesn't pick the older Roaming copy).
-if [ -f "$OLD_ROAMING_PACKAGES/Supervertaler for Trados.sdlplugin" ]; then
-    echo "  Removing old Roaming Packages/Supervertaler for Trados.sdlplugin..."
-    rm -f "$OLD_ROAMING_PACKAGES/Supervertaler for Trados.sdlplugin"
-fi
-if [ -d "$OLD_ROAMING_UNPACKED" ]; then
-    echo "  Removing old Roaming Unpacked/Supervertaler for Trados..."
-    rm -rf "$OLD_ROAMING_UNPACKED"
-fi
-
-# Remove old TermLens package if it exists
-OLD_PACKAGE="$PACKAGES_DIR/TermLens.sdlplugin"
-if [ -f "$OLD_PACKAGE" ]; then
-    echo "  Removing old TermLens.sdlplugin..."
-    rm -f "$OLD_PACKAGE"
-fi
-
-# Remove old dotted-name package (replaced by spaced name matching PlugInName in manifest)
-OLD_DOTTED="$PACKAGES_DIR/Supervertaler.Trados.sdlplugin"
-if [ -f "$OLD_DOTTED" ]; then
-    echo "  Removing old Supervertaler.Trados.sdlplugin..."
-    rm -f "$OLD_DOTTED"
-fi
-OLD_DOTTED_UNPACKED="$APPDATA/Trados/Trados Studio/18/Plugins/Unpacked/Supervertaler.Trados"
-if [ -d "$OLD_DOTTED_UNPACKED" ]; then
-    echo "  Removing old Unpacked/Supervertaler.Trados..."
-    rm -rf "$OLD_DOTTED_UNPACKED"
-fi
-
-# Copy the new package.
-mkdir -p "$PACKAGES_DIR"
-cp "$DIST_DIR/$PLUGIN_FILENAME" "$PACKAGES_DIR/$PLUGIN_FILENAME"
-echo "  Installed: $PACKAGES_DIR/$PLUGIN_FILENAME"
-
-echo ""
-echo "=== Done — start Trados Studio to load the updated plugin ==="
+echo "=== Done — start Trados Studio to load the updated plugin(s) ==="

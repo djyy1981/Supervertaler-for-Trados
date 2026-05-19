@@ -19,7 +19,7 @@ namespace Supervertaler.Trados.Core
     ///   mtFields        – field definitions (name, type)
     ///   mtFieldsValues  – field values per entry
     /// </summary>
-    public class MultiTermReader : IDisposable
+    public class MultiTermReader : ITermbaseReader
     {
         private OleDbConnection _connection;
         private readonly string _filePath;

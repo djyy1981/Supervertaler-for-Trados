@@ -1,5 +1,40 @@
 # Changelog
 
+## [4.20.0] – 2026-05-19
+
+### Added (Trados Studio 2026 support — a second, x64 build of the plugin that runs natively in Studio 2026 and reads its new SQLite-based .ttb termbases)
+
+Trados Studio 2026 (internally Studio 19) is a 64-bit application and ships a redesigned terminology system: the legacy MultiTerm components are gone from the install, and the built-in termbase format is now a SQLite database with the `.ttb` extension (still concept-oriented, still using the MultiTerm-style termbase-definition XML internally, but on a completely new storage engine with an FTS5 full-text index). The existing plugin targeted Studio 2024 (Studio 18), is x86/AnyCPU, and reads `.sdltb` termbases via JET/ACE OleDb — none of which works under Studio 2026. This release adds a parallel build so the same source tree produces two `.sdlplugin` artefacts: the unchanged Studio 2024 build and a new Studio 2026 build.
+
+**One source tree, two builds.** A `TradosStudioVersion` MSBuild property (default `18`) switches the build between Studio 18 and Studio 19: HintPaths (`Studio18` vs `Studio19Beta`), platform target (x86/AnyCPU vs **x64**), output folder (`bin\Studio18` vs `bin\Studio19`), and which `pluginpackage.manifest` is shipped. The Studio 19 manifest declares `RequiredProduct minversion="19.0" maxversion="19.0.9"`. `build.sh` builds both, packages both, and deploys each to its respective Trados plugins folder. `bump_version.py` keeps both manifests in version-lock.
+
+**TtbReader.** A new `Core/TtbReader.cs` reads `.ttb` files directly with `Microsoft.Data.Sqlite` (the same SQLite stack already bundled for the Supervertaler database). It maps the `mtConcepts` / `mtTerms` / `mtIndexes` tables to the existing `TermEntry` model, matching the public surface of `MultiTermReader` so the rest of TermLens is unchanged. Both readers now implement a shared `ITermbaseReader` interface; `TermbaseReaderFactory.Create()` dispatches on file extension (`.ttb` → SQLite, otherwise `.sdltb` → OleDb). Locale handling is case-insensitive to bridge Trados's BCP-47 codes (`en-GB`) with the uppercase codes the `.ttb` store uses (`EN-GB`). The project termbase detector now recognises `.ttb` alongside `.sdltb`.
+
+The legacy terminology-provider plugin API (`Sdl.Terminology.TerminologyProvider.Core`) is preserved in Studio 2026 behind compatibility adapters, so no migration to the new `Sdl.TranslationResourcesApi.TB` namespace was required — the plugin registers and reads terminology exactly as before. The Studio 2026 build ships with `.ttb` support only; `.sdltb` reading is not included in the 2026 build because JET OleDb is 32-bit-only and Studio 2026 is 64-bit (legacy `.sdltb` handling in 2026 is deferred pending RWS guidance on their migration story).
+
+### Fixed (a stack of x64-specific defects that only surfaced once the plugin ran as a 64-bit process under Studio 2026)
+
+**SQLite provider not registered.** Opening any database failed with "You need to call SQLitePCL.raw.SetProvider()". Two compounding causes: the startup init called `Batteries_V2.Init()` with the wrong type name (the classes live in the `SQLitePCL` namespace, not `SQLitePCLRaw`, despite the package name), so it silently no-op'd; and even once corrected, `Assembly.Load("SQLitePCLRaw.batteries_v2")` returned Studio's own bundled copy, registering the provider on a different `raw` instance than the one Microsoft.Data.Sqlite ends up bound to. The fix loads the plugin-folder copies of `SQLitePCLRaw.batteries_v2` and `SQLitePCLRaw.core` by absolute path so initialisation runs against the same instance the data layer uses. Studio 2024 (x86) never hit this because a different DLL-load order happened to register a provider already.
+
+**Arithmetic overflow crash opening TermLens.** `CtrlTapFilter.PreFilterMessage` cast `m.WParam` (an `IntPtr`, 64-bit under x64) straight to `int`, throwing `OverflowException` whenever the WPARAM had high bits set. Now reads via `ToInt64()` and masks to the low byte before narrowing.
+
+**Removed-API build break.** The two-argument `ITerminologyProviderFactory.CreateTerminologyProvider(Uri, ITerminologyProviderCredentialStore)` overload (obsolete in 2024, removed in 2026) is replaced with the single-argument form that exists in both.
+
+**Two-minute editor freeze on first interaction.** Termbase loading (the Supervertaler database plus project termbases) ran synchronously during view-part initialisation, blocking editor activation until it finished — on x64 with a cold disk that was up to two minutes. The load now runs on a background thread; the editor is responsive immediately and term chips populate a few seconds later.
+
+**First click on every plugin-pane button was ignored.** Studio 2026's WPF-based docking host consumes the first `WM_LBUTTONDOWN` while activating a previously-inactive dock pane, so neither `MouseDown` nor `Click` fired — every header/action button across TermLens, SuperSearch, and the AI Assistant required two clicks. A new `Core/ClickThrough` helper pre-emptively activates the pane on `MouseEnter` via a native `SetFocus` call (deliberately not WinForms `Control.Focus`, which would trigger `ScrollControlIntoView` and disturb the panel layout), with a `GotFocus`-based fallback that synthesises the action when the user is still holding the mouse button down on the control. Applied to all pane buttons.
+
+**TermLens corner indicators clipped.** The amber metadata dot and indigo synonym icon at a chip's top-right corner were clipped on the right edge (reading visually as "cut off at the top") because the chip reserved too little right-side padding for the icon and its border. The chip now reserves the indicator's overflow width when an indicator is present. This was a pre-existing defect, fixed in both the Studio 2024 and Studio 2026 builds.
+
+### Changed (AI prompt termbase inclusion is now opt-in by default)
+
+The "Termbases included in AI prompts" list now defaults to **nothing included** — users explicitly enable the termbases they want fed to the AI, rather than everything being included unless explicitly excluded. A one-shot migration (mirroring the existing per-project behaviour) applies the opt-in default on first load: when the global AI termbase list has never been initialised and no explicit choices exist, all termbases are set to excluded. Users with existing explicit selections are left untouched. This is a privacy-first default — sensitive termbase contents are no longer sent to the AI provider unless the user opts in.
+
+### Packaging
+
+`package_plugin.py` now ships the `pluginpackage.manifest.xml` produced by the build (which carries the correct `RequiredProduct` range per Studio version) instead of regenerating it from a hardcoded template that always declared the Studio 2024 range — the cause of the Studio 2026 build initially being silently skipped by Studio's plugin loader.
+
+
 ## [4.19.114] – 2026-05-17
 
 ### Fixed (v4.19.113 ↻ refresh button was clipped against the floating gear icon overlay; bumped TermLens header right-padding to give it breathing room)

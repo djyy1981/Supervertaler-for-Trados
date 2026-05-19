@@ -19,6 +19,7 @@ BASE_DIR = os.path.dirname(__file__)
 SRC_DIR = os.path.join(BASE_DIR, "src", "Supervertaler.Trados")
 PLUGIN_XML = os.path.join(SRC_DIR, "Supervertaler.Trados.plugin.xml")
 MANIFEST_XML = os.path.join(SRC_DIR, "pluginpackage.manifest.xml")
+MANIFEST_XML_19 = os.path.join(SRC_DIR, "pluginpackage.manifest.19.xml")
 CSPROJ = os.path.join(SRC_DIR, "Supervertaler.Trados.csproj")
 
 # Matches any existing version value – normal (digits+dots) OR corrupted (anything non-XML)
@@ -52,21 +53,26 @@ def bump_csproj(new_three):
 
 
 def bump_manifest(new_four):
-    """Update pluginpackage.manifest.xml <Version>."""
-    with open(MANIFEST_XML, "r", encoding="utf-8") as f:
-        text = f.read()
+    """Update <Version> in both manifests (Studio 18 + Studio 19)."""
+    for path in (MANIFEST_XML, MANIFEST_XML_19):
+        if not os.path.exists(path):
+            print(f"  WARNING: manifest not found: {path}")
+            continue
 
-    pattern = re.compile(rf"<Version>{VERSION_VALUE}</Version>")
-    if not pattern.search(text):
-        print("  WARNING: <Version> not found in manifest")
-        return
+        with open(path, "r", encoding="utf-8") as f:
+            text = f.read()
 
-    text = pattern.sub(f"<Version>{new_four}</Version>", text)
+        pattern = re.compile(rf"<Version>{VERSION_VALUE}</Version>")
+        if not pattern.search(text):
+            print(f"  WARNING: <Version> not found in {os.path.basename(path)}")
+            continue
 
-    with open(MANIFEST_XML, "w", encoding="utf-8") as f:
-        f.write(text)
+        text = pattern.sub(f"<Version>{new_four}</Version>", text)
 
-    print(f"  pluginpackage.manifest.xml: Version={new_four}")
+        with open(path, "w", encoding="utf-8") as f:
+            f.write(text)
+
+        print(f"  {os.path.basename(path)}: Version={new_four}")
 
 
 def bump_plugin_xml(new_four):
@@ -118,14 +124,18 @@ def verify_versions(new_three, new_four):
     elif match.group(1) != new_three:
         errors.append(f".csproj <InformationalVersion> is '{match.group(1)}', expected '{new_three}'")
 
-    # Check manifest
-    with open(MANIFEST_XML, "r", encoding="utf-8") as f:
-        text = f.read()
-    match = re.search(r"<Version>([^<]+)</Version>", text)
-    if not match:
-        errors.append("manifest <Version> tag not found")
-    elif match.group(1) != new_four:
-        errors.append(f"manifest <Version> is '{match.group(1)}', expected '{new_four}'")
+    # Check both manifests
+    for path in (MANIFEST_XML, MANIFEST_XML_19):
+        if not os.path.exists(path):
+            errors.append(f"manifest not found: {os.path.basename(path)}")
+            continue
+        with open(path, "r", encoding="utf-8") as f:
+            text = f.read()
+        match = re.search(r"<Version>([^<]+)</Version>", text)
+        if not match:
+            errors.append(f"{os.path.basename(path)} <Version> tag not found")
+        elif match.group(1) != new_four:
+            errors.append(f"{os.path.basename(path)} <Version> is '{match.group(1)}', expected '{new_four}'")
 
     # Check plugin.xml
     with open(PLUGIN_XML, "rb") as f:

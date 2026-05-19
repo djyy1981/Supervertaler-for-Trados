@@ -142,11 +142,13 @@ namespace Supervertaler.Trados.Controls
 
             _btnSearch = CreateButton("Search", bodyFont, 72, 26);
             _btnSearch.Click += (s, e) => FireSearch();
+            Core.ClickThrough.Attach(_btnSearch, () => FireSearch());
             _searchPanel.Controls.Add(_btnSearch);
 
             _btnStop = CreateButton("Stop", bodyFont, 46, 26);
             _btnStop.Visible = false;
             _btnStop.Click += (s, e) => StopRequested?.Invoke(this, EventArgs.Empty);
+            Core.ClickThrough.Attach(_btnStop, () => StopRequested?.Invoke(this, EventArgs.Empty));
             _searchPanel.Controls.Add(_btnStop);
 
             _cboMode = new ComboBox
@@ -231,12 +233,14 @@ namespace Supervertaler.Trados.Controls
             var ttFiles = new ToolTip();
             ttFiles.SetToolTip(_btnFiles, "Select which project files to include in the search");
             _btnFiles.Click += (s, e) => ShowFileSelectionDialog();
+            Core.ClickThrough.Attach(_btnFiles, () => ShowFileSelectionDialog());
             _searchPanel.Controls.Add(_btnFiles);
 
             _btnTms = CreateButton("TMs", bodyFont, 52, 26);
             var ttTms = new ToolTip();
             ttTms.SetToolTip(_btnTms, "Select which translation memories to include in the search");
             _btnTms.Click += (s, e) => ShowTmSelectionDialog();
+            Core.ClickThrough.Attach(_btnTms, () => ShowTmSelectionDialog());
             _searchPanel.Controls.Add(_btnTms);
 
             _btnHelp = new Button
@@ -251,6 +255,7 @@ namespace Supervertaler.Trados.Controls
             };
             _btnHelp.FlatAppearance.BorderColor = BorderColor;
             _btnHelp.Click += (s, e) => HelpRequested?.Invoke(this, EventArgs.Empty);
+            Core.ClickThrough.Attach(_btnHelp, () => HelpRequested?.Invoke(this, EventArgs.Empty));
             _searchPanel.Controls.Add(_btnHelp);
 
             _searchPanel.Resize += (s, e) => LayoutSearchBar();
@@ -286,10 +291,12 @@ namespace Supervertaler.Trados.Controls
 
             _btnReplace = CreateButton("Replace", bodyFont, 76, 26);
             _btnReplace.Click += (s, e) => FireReplace();
+            Core.ClickThrough.Attach(_btnReplace, () => FireReplace());
             _replacePanel.Controls.Add(_btnReplace);
 
             _btnReplaceAll = CreateButton("Replace All", bodyFont, 94, 26);
             _btnReplaceAll.Click += (s, e) => FireReplaceAll();
+            Core.ClickThrough.Attach(_btnReplaceAll, () => FireReplaceAll());
             _replacePanel.Controls.Add(_btnReplaceAll);
 
             var lblReplaceHint = new Label

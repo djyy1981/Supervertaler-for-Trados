@@ -55,20 +55,54 @@ namespace Supervertaler.Trados
             AppDomain.CurrentDomain.AssemblyResolve += OnAssemblyResolve;
             PreloadNativeSQLite();
 
-            // Use reflection to call SQLitePCLRaw.Batteries_V2.Init() without
-            // a compile-time dependency on the transitive package.
+            // Call SQLitePCL.Batteries_V2.Init() via reflection (no compile-time
+            // dependency on the transitive package).
+            //
+            // The TYPE LIVES IN THE `SQLitePCL` NAMESPACE, not `SQLitePCLRaw`.
+            // The package name and the namespace differ — easy to get wrong.
+            // Init() loads e_sqlite3, calls Setup on the dynamic_cdecl provider,
+            // and calls raw.SetProvider in one shot — everything Microsoft.Data.Sqlite
+            // needs before its first Open(). Under Studio 2024 (x86) this Init()
+            // call silently no-op'd because of the wrong namespace, but some other
+            // Trados-loaded assembly transitively triggered SQLite init. Studio 2026
+            // (x64) doesn't have that lucky side-effect, so the typo surfaced.
+            // SQLite provider registration via reflection. CRITICAL: load
+            // SQLitePCLRaw.batteries_v2 by ABSOLUTE PATH from the plugin folder, not
+            // by short name. Assembly.Load("SQLitePCLRaw.batteries_v2") returns
+            // whatever Trados already has loaded (Studio 2026 has its own SQLitePCL
+            // 2.1.2 loaded by startup), but Microsoft.Data.Sqlite is bound via our
+            // AssemblyResolve handler to OUR plugin-folder SQLitePCLRaw 2.1.6 copy.
+            // Calling Batteries_V2.Init() on Trados's instance sets the provider on
+            // Trados's `raw` static state — invisible to our Microsoft.Data.Sqlite,
+            // which then errors with "You need to call SQLitePCL.raw.SetProvider()".
+            // LoadFrom() with the explicit plugin path forces our instance, so Init()
+            // runs against the SAME core SQLitePCLRaw that Microsoft.Data.Sqlite uses.
+            //
+            // The namespace is "SQLitePCL.Batteries_V2" — NOT "SQLitePCLRaw.Batteries_V2".
+            // Easy trap: the NuGet package is SQLitePCLRaw.* but the classes live in
+            // the SQLitePCL namespace.
             try
             {
-                var asm = Assembly.Load("SQLitePCLRaw.batteries_v2");
-                var type = asm?.GetType("SQLitePCLRaw.Batteries_V2");
-                var init = type?.GetMethod("Init", BindingFlags.Public | BindingFlags.Static);
-                init?.Invoke(null, null);
+                var pluginDir = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
+                var batteriesPath = Path.Combine(pluginDir, "SQLitePCLRaw.batteries_v2.dll");
+                if (File.Exists(batteriesPath))
+                {
+                    // Pre-load our SQLitePCLRaw.core so Init's typeref to `raw` resolves
+                    // to the same instance Microsoft.Data.Sqlite ends up using.
+                    var corePath = Path.Combine(pluginDir, "SQLitePCLRaw.core.dll");
+                    if (File.Exists(corePath))
+                        Assembly.LoadFrom(corePath);
+
+                    var asm = Assembly.LoadFrom(batteriesPath);
+                    var type = asm?.GetType("SQLitePCL.Batteries_V2");
+                    var init = type?.GetMethod("Init", BindingFlags.Public | BindingFlags.Static);
+                    init?.Invoke(null, null);
+                }
             }
             catch
             {
-                // Swallow – SqliteConnection's static ctor will retry.
-                // If it also fails, the user gets a descriptive error
-                // when they first try to use a database.
+                // SqliteConnection.Open() will surface a descriptive error if the
+                // provider truly isn't registered.
             }
 
             // First-run setup: show folder-selection dialog when no config.json exists yet
