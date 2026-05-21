@@ -129,6 +129,12 @@ namespace Supervertaler.Trados.Controls
         /// <summary>Raised when the user clicks "Distill" in the SuperMemory toolbar.</summary>
         public event EventHandler DistillRequested;
 
+        /// <summary>Raised when the user clicks "Overview" in the SuperMemory toolbar.</summary>
+        public event EventHandler OverviewRequested;
+
+        /// <summary>Raised when the user clicks "Summary" in the SuperMemory toolbar.</summary>
+        public event EventHandler AiSummaryRequested;
+
         /// <summary>Raised when the user clicks the refresh button in the SuperMemory toolbar.</summary>
         public event EventHandler SuperMemoryRefreshRequested;
 
@@ -387,6 +393,10 @@ namespace Supervertaler.Trados.Controls
                 HealthCheckRequested?.Invoke(this, EventArgs.Empty);
             _superMemoryToolbar.DistillRequested += (s, e) =>
                 DistillRequested?.Invoke(this, EventArgs.Empty);
+            _superMemoryToolbar.OverviewRequested += (s, e) =>
+                OverviewRequested?.Invoke(this, EventArgs.Empty);
+            _superMemoryToolbar.AiSummaryRequested += (s, e) =>
+                AiSummaryRequested?.Invoke(this, EventArgs.Empty);
             _superMemoryToolbar.RefreshRequested += (s, e) =>
                 SuperMemoryRefreshRequested?.Invoke(this, EventArgs.Empty);
             _superMemoryToolbar.MemoryBankChanged += (s, e) =>

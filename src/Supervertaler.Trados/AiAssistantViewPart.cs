@@ -281,6 +281,8 @@ namespace Supervertaler.Trados
             _control.Value.ProcessInboxRequested += OnProcessInbox;
             _control.Value.HealthCheckRequested += OnHealthCheck;
             _control.Value.DistillRequested += OnDistill;
+            _control.Value.OverviewRequested += OnOverview;
+            _control.Value.AiSummaryRequested += OnAiSummary;
             _control.Value.SuperMemoryRefreshRequested += (s, e) => RefreshSuperMemoryInboxCount();
             _control.Value.MemoryBankChanged += OnMemoryBankChanged;
             _control.Value.NewMemoryBankRequested += OnNewMemoryBankRequested;
@@ -2281,6 +2283,123 @@ namespace Supervertaler.Trados
                         _control.Value.SetThinking(false);
                         _control.Value.SetSuperMemoryBusy(false);
                         AddErrorMessage($"Health Check scan failed: {capturedError}");
+                    });
+                }
+            });
+        }
+
+        /// <summary>
+        /// Overview button: generate a self-contained HTML overview of the active
+        /// memory bank from its frontmatter index and open it in the browser.
+        /// Metadata only – no LLM call – so it is fast and free.
+        /// </summary>
+        private void OnOverview(object sender, EventArgs e)
+        {
+            var vaultDir = ActiveMemoryBankDir;
+            var bankName = ActiveMemoryBankName;
+            if (!Directory.Exists(vaultDir))
+            {
+                ShowSuperMemoryMessage($"Memory bank **{bankName}** does not exist yet.\n\n" +
+                    $"Expected location:\n`{vaultDir}`");
+                return;
+            }
+
+            var capturedDir = vaultDir;
+            var capturedName = bankName;
+            Task.Run(() =>
+            {
+                try
+                {
+                    var reader = new MemoryBankReader(capturedDir);
+                    var index = reader.GetIndexSnapshot();
+                    var path = MemoryBankReport.WriteHtmlOverviewToTempFile(index, capturedName);
+                    System.Diagnostics.Process.Start(
+                        new System.Diagnostics.ProcessStartInfo(path) { UseShellExecute = true });
+
+                    SafeInvoke(() => ShowSuperMemoryMessage(
+                        $"\U0001F4CA **Memory bank overview** generated for **{capturedName}** " +
+                        $"({index.Count} notes) and opened in your browser.\n\n`{path}`"));
+                }
+                catch (Exception ex)
+                {
+                    var err = ex.Message;
+                    SafeInvoke(() => AddErrorMessage($"Overview generation failed: {err}"));
+                }
+            });
+        }
+
+        /// <summary>
+        /// Summary button: ask the AI for a short plain-English profile of the
+        /// active memory bank, built from a compact metadata digest (counts,
+        /// domains, conflicts, term list) rather than full article bodies.
+        /// </summary>
+        private void OnAiSummary(object sender, EventArgs e)
+        {
+            _control.Value.ReengageAutoScroll();
+
+            var vaultDir = ActiveMemoryBankDir;
+            var bankName = ActiveMemoryBankName;
+            if (!Directory.Exists(vaultDir))
+            {
+                ShowSuperMemoryMessage($"Memory bank **{bankName}** does not exist yet.\n\n" +
+                    $"Expected location:\n`{vaultDir}`");
+                return;
+            }
+
+            _control.Value.AddMessage(new ChatMessage
+            {
+                Role = ChatRole.Assistant,
+                Content = $"✨ **SuperMemory: Summary** — profiling memory bank **{bankName}**…"
+            });
+            _control.Value.SetThinking(true);
+            _control.Value.SetSuperMemoryBusy(true);
+            SaveChatHistory();
+
+            var capturedDir = vaultDir;
+            var capturedName = bankName;
+            Task.Run(() =>
+            {
+                try
+                {
+                    var reader = new MemoryBankReader(capturedDir);
+                    var index = reader.GetIndexSnapshot();
+
+                    if (index.Count == 0)
+                    {
+                        SafeInvoke(() =>
+                        {
+                            _control.Value.SetThinking(false);
+                            _control.Value.SetSuperMemoryBusy(false);
+                            ShowSuperMemoryMessage($"Memory bank **{capturedName}** is empty — nothing to summarise.");
+                        });
+                        return;
+                    }
+
+                    var digest = MemoryBankReport.BuildMetadataDigest(index, capturedName);
+                    const string systemPrompt =
+                        "You are a terminology and knowledge-base analyst. You are given a metadata " +
+                        "digest of a translator's SuperMemory knowledge base: totals, domain coverage, " +
+                        "terminology conflicts, stubs, and a list of source -> target term decisions. " +
+                        "Write a short, scannable plain-English profile so the translator can see at a " +
+                        "glance what their bank contains. Cover: (1) overall size and main focus; " +
+                        "(2) the strongest domains and any thin or under-covered areas; (3) anything " +
+                        "needing attention - conflicting term pairs, stubs, stale notes - naming "  +
+                        "specific examples from the digest. Keep it to two short paragraphs plus a few " +
+                        "bullet points. Be concrete and cite numbers. Use British English spelling. " +
+                        "Do not invent entries that are not present in the digest.";
+
+                    SafeInvoke(() =>
+                        RunSuperMemoryAgent(systemPrompt, digest, "",
+                            PromptLogFeature.SuperMemory, "SuperMemory: Summary", _ => { }));
+                }
+                catch (Exception ex)
+                {
+                    var err = ex.Message;
+                    SafeInvoke(() =>
+                    {
+                        _control.Value.SetThinking(false);
+                        _control.Value.SetSuperMemoryBusy(false);
+                        AddErrorMessage($"Summary failed: {err}");
                     });
                 }
             });

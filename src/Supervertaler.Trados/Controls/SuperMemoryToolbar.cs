@@ -18,6 +18,8 @@ namespace Supervertaler.Trados.Controls
         private Button _btnProcessInbox;
         private Button _btnHealthCheck;
         private Button _btnDistill;
+        private Button _btnOverview;
+        private Button _btnSummary;
         private Button _btnRefresh;
         private Label _lblInboxCount;
 
@@ -36,6 +38,12 @@ namespace Supervertaler.Trados.Controls
 
         /// <summary>Raised when the user clicks "Distill".</summary>
         public event EventHandler DistillRequested;
+
+        /// <summary>Raised when the user clicks "Overview" (generate HTML overview).</summary>
+        public event EventHandler OverviewRequested;
+
+        /// <summary>Raised when the user clicks "Summary" (AI natural-language summary).</summary>
+        public event EventHandler AiSummaryRequested;
 
         /// <summary>Raised when the user clicks the refresh button.</summary>
         public event EventHandler RefreshRequested;
@@ -67,6 +75,28 @@ namespace Supervertaler.Trados.Controls
         public SuperMemoryToolbar()
         {
             BuildUI();
+        }
+
+        /// <summary>Creates a flat text button styled like the other toolbar actions.</summary>
+        private Button MakeActionButton(string text, Font font)
+        {
+            var b = new Button
+            {
+                Text = text,
+                Font = font,
+                FlatStyle = FlatStyle.Flat,
+                ForeColor = Color.FromArgb(30, 90, 158),
+                BackColor = Color.Transparent,
+                Cursor = Cursors.Hand,
+                AutoSize = true,
+                Padding = new Padding(UiScale.Pixels(4), 0, UiScale.Pixels(4), 0),
+                Height = UiScale.Pixels(24),
+                TabStop = false,
+                UseCompatibleTextRendering = true
+            };
+            b.FlatAppearance.BorderSize = 0;
+            b.FlatAppearance.MouseOverBackColor = Color.FromArgb(220, 232, 245);
+            return b;
         }
 
         private void BuildUI()
@@ -207,6 +237,23 @@ namespace Supervertaler.Trados.Controls
                 "memory bank. Source files dropped into the inbox are\n" +
                 "archived after a successful distill.");
 
+            // ─── Overview button ────────────────────────────────────
+            _btnOverview = MakeActionButton("\U0001F4CA Overview", btnFont); // 📊
+            _btnOverview.Click += (s, e) => OverviewRequested?.Invoke(this, EventArgs.Empty);
+            tip.SetToolTip(_btnOverview,
+                "Open a scannable HTML overview of the active memory bank:\n" +
+                "a searchable terminology table, conflicting-term and stub\n" +
+                "lists, domain/client coverage, and recent changes. Opens in\n" +
+                "your browser; reads only metadata, so it is instant.");
+
+            // ─── AI Summary button ──────────────────────────────────
+            _btnSummary = MakeActionButton("✨ Summary", btnFont); // ✨
+            _btnSummary.Click += (s, e) => AiSummaryRequested?.Invoke(this, EventArgs.Empty);
+            tip.SetToolTip(_btnSummary,
+                "Ask the AI for a short plain-English profile of the active\n" +
+                "memory bank: what it covers, where it is strong or thin, and\n" +
+                "what needs attention. Posted into the chat.");
+
             // ─── Inbox count label ───────────────────────────────────
             _lblInboxCount = new Label
             {
@@ -249,6 +296,8 @@ namespace Supervertaler.Trados.Controls
             Controls.Add(sep);
             Controls.Add(_btnRefresh);
             Controls.Add(_lblInboxCount);
+            Controls.Add(_btnSummary);
+            Controls.Add(_btnOverview);
             Controls.Add(_btnDistill);
             Controls.Add(_btnHealthCheck);
             Controls.Add(_btnProcessInbox);
@@ -287,7 +336,13 @@ namespace Supervertaler.Trados.Controls
             x += _btnHealthCheck.Width + UiScale.Pixels(2);
 
             _btnDistill.Location = new Point(x, y);
-            x += _btnDistill.Width + UiScale.Pixels(6);
+            x += _btnDistill.Width + UiScale.Pixels(2);
+
+            _btnOverview.Location = new Point(x, y);
+            x += _btnOverview.Width + UiScale.Pixels(2);
+
+            _btnSummary.Location = new Point(x, y);
+            x += _btnSummary.Width + UiScale.Pixels(6);
 
             _lblInboxCount.Location = new Point(x,
                 (Height - _lblInboxCount.Height) / 2);
@@ -346,6 +401,10 @@ namespace Supervertaler.Trados.Controls
             // because the user picks files via a dialog.
             _btnHealthCheck.Enabled = !busy;
             _btnDistill.Enabled = !busy;
+            // Overview is metadata-only and never calls the LLM, so it stays
+            // usable even while an AI operation is running. Summary uses the LLM,
+            // so it follows the busy flag.
+            _btnSummary.Enabled = !busy;
 
             if (!busy)
             {
@@ -354,12 +413,14 @@ namespace Supervertaler.Trados.Controls
                     : Color.FromArgb(170, 170, 170);
                 _btnHealthCheck.ForeColor = Color.FromArgb(30, 90, 158);
                 _btnDistill.ForeColor = Color.FromArgb(30, 90, 158);
+                _btnSummary.ForeColor = Color.FromArgb(30, 90, 158);
             }
             else
             {
                 _btnProcessInbox.ForeColor = Color.FromArgb(170, 170, 170);
                 _btnHealthCheck.ForeColor = Color.FromArgb(170, 170, 170);
                 _btnDistill.ForeColor = Color.FromArgb(170, 170, 170);
+                _btnSummary.ForeColor = Color.FromArgb(170, 170, 170);
             }
         }
 

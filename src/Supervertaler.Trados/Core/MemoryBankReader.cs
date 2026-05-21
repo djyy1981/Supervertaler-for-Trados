@@ -22,6 +22,12 @@ namespace Supervertaler.Trados.Core
         private List<KbArticleIndex> _index;
         private DateTime _indexBuiltAt;
 
+        // Cache of lowercased note bodies for content matching, keyed by file
+        // path and invalidated per-file by last-write time (so external Obsidian
+        // edits are picked up). Only populated when a query is supplied.
+        private readonly Dictionary<string, KeyValuePair<long, string>> _bodyCache
+            = new Dictionary<string, KeyValuePair<long, string>>(StringComparer.OrdinalIgnoreCase);
+
         // Folders to scan for memory-bank articles (skip 00_INBOX, 05_INDICES, 06_TEMPLATES)
         internal static readonly string[] ContentFolders =
             { "01_CLIENTS", "02_TERMINOLOGY", "03_DOMAINS", "04_STYLE" };
@@ -116,6 +122,18 @@ namespace Supervertaler.Trados.Core
 
             _index = entries;
             _indexBuiltAt = DateTime.UtcNow;
+        }
+
+        /// <summary>
+        /// Returns a snapshot of the current frontmatter index (refreshing if
+        /// stale). Used by the overview/reporting features that need lightweight
+        /// metadata for every note without reading full article bodies.
+        /// </summary>
+        public IReadOnlyList<KbArticleIndex> GetIndexSnapshot()
+        {
+            if (!VaultExists) return new List<KbArticleIndex>();
+            RefreshIndex();
+            return _index ?? new List<KbArticleIndex>();
         }
 
         /// <summary>
@@ -358,6 +376,7 @@ namespace Supervertaler.Trados.Core
             if (terms.Count == 0) return terms;
 
             var queryLower = string.IsNullOrWhiteSpace(queryText) ? null : queryText.ToLowerInvariant();
+            var queryTokens = QueryTokens(queryLower);
 
             // Score each term article by relevance
             var scored = new List<(KbArticleIndex entry, int score)>();
@@ -369,6 +388,22 @@ namespace Supervertaler.Trados.Core
                 // Query match: the user explicitly mentioned this term. Dominant signal.
                 if (queryLower != null && QueryMentionsTerm(t, queryLower))
                     score += QueryMatchBoost;
+
+                // Content match: the user's query words appear in the note BODY
+                // (not just its frontmatter term). Additive – surfaces a note that
+                // discusses the topic even when its title/term doesn't match. Read
+                // bodies only when there is a query (chat), and cache by mtime.
+                if (queryTokens.Count > 0)
+                {
+                    var body = GetBodyLower(t);
+                    if (body.Length > 0)
+                    {
+                        int hits = 0;
+                        foreach (var tok in queryTokens)
+                            if (body.IndexOf(tok, StringComparison.Ordinal) >= 0) hits++;
+                        if (hits > 0) score += Math.Min(hits * 5, 40);
+                    }
+                }
 
                 // Client match: +3 points
                 if (!string.IsNullOrEmpty(clientName))
@@ -415,6 +450,39 @@ namespace Supervertaler.Trados.Core
                 .OrderByDescending(x => x.score)
                 .Select(x => x.entry)
                 .ToList();
+        }
+
+        /// <summary>Lower-cased note body, cached and invalidated by file mtime.</summary>
+        private string GetBodyLower(KbArticleIndex entry)
+        {
+            try
+            {
+                var mtime = File.GetLastWriteTimeUtc(entry.FilePath).Ticks;
+                if (_bodyCache.TryGetValue(entry.FilePath, out var cached) && cached.Key == mtime)
+                    return cached.Value;
+                var text = (ReadFullArticle(entry.FilePath) ?? "").ToLowerInvariant();
+                _bodyCache[entry.FilePath] = new KeyValuePair<long, string>(mtime, text);
+                return text;
+            }
+            catch { return ""; }
+        }
+
+        /// <summary>
+        /// Splits a lower-cased query into distinct word tokens of 4+ characters
+        /// (short words are too noisy for body matching).
+        /// </summary>
+        private static List<string> QueryTokens(string queryLower)
+        {
+            var tokens = new List<string>();
+            if (string.IsNullOrEmpty(queryLower)) return tokens;
+            var sb = new StringBuilder();
+            foreach (var ch in queryLower)
+            {
+                if (char.IsLetterOrDigit(ch)) sb.Append(ch);
+                else { if (sb.Length >= 4) tokens.Add(sb.ToString()); sb.Clear(); }
+            }
+            if (sb.Length >= 4) tokens.Add(sb.ToString());
+            return tokens.Distinct().ToList();
         }
 
         /// <summary>

@@ -1,5 +1,16 @@
 # Changelog
 
+## [4.20.4] – 2026-05-21
+
+### Added
+
+- **Memory Bank Overview (new toolbar button).** A "📊 Overview" button in the SuperMemory toolbar generates a single, self-contained HTML page and opens it in your browser, so you can see at a glance what is in the active memory bank. It includes: dashboard counts (terminology, domains, clients, style guides); a searchable, sortable terminology table (source → target, domain, client, confidence, status, updated); a list of conflicting term pairs (same source term mapped to different targets); stub/incomplete notes; terminology notes missing a domain; stale notes (not updated in over a year); domain and client coverage; and the most recently updated notes. It reads only note frontmatter, so it is instant even on large banks.
+- **AI memory-bank summary (new toolbar button).** A "✨ Summary" button asks the AI for a short, plain-English profile of the active bank — overall size and focus, strongest and thinnest domains, and what needs attention (conflicts, stubs, stale notes) with specific examples. The summary is built from a compact metadata digest rather than full article bodies, so it stays cheap, and the result is posted into the chat.
+
+### Improved
+
+- **AI chat now also matches your question against terminology note *bodies*, not just their term names.** Building on the v4.20.3 retrieval fixes, a note whose body discusses the topic you asked about is now surfaced even when its title/term field does not match your wording. Note bodies are read on demand and cached by file modification time, so external Obsidian edits are picked up automatically. (A persisted SQLite/FTS5 index – useful for very large banks with thousands of notes – remains a documented future step.)
+
 ## [4.20.3] – 2026-05-21
 
 ### Fixed
