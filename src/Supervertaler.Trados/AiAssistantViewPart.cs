@@ -623,8 +623,10 @@ namespace Supervertaler.Trados
             var fileName = GetFileName();
 
             // 3. Build system prompt with full context
-            // Load SuperMemory KB context (if vault exists)
-            var kbPromptSection = LoadKbContextForPrompt(projectName, sourceLang, targetLang);
+            // Load SuperMemory KB context (if vault exists). Pass the user's
+            // message so a term they ask about is force-included even when the
+            // document's domain/language wouldn't otherwise rank that note.
+            var kbPromptSection = LoadKbContextForPrompt(projectName, sourceLang, targetLang, messageText);
 
             var chatCtx = new ChatContext
             {
@@ -1513,7 +1515,7 @@ namespace Supervertaler.Trados
         /// Loads SuperMemory KB context for the current project/document.
         /// Returns the formatted prompt section, or null if KB is empty/unavailable.
         /// </summary>
-        private string LoadKbContextForPrompt(string projectName, string sourceLang, string targetLang)
+        private string LoadKbContextForPrompt(string projectName, string sourceLang, string targetLang, string queryText = null)
         {
             try
             {
@@ -1550,7 +1552,7 @@ namespace Supervertaler.Trados
 
                 var ctx = _kbReader.LoadContext(
                     projectName, domain, sourceLang, targetLang,
-                    tokenBudget: 24000);
+                    tokenBudget: 24000, queryText: queryText);
 
                 if (ctx == null) return null;
 

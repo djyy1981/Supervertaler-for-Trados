@@ -1,5 +1,14 @@
 # Changelog
 
+## [4.20.3] – 2026-05-21
+
+### Fixed
+
+- **AI chat now reliably surfaces a memory-bank term you ask about.** When you ask the AI Assistant about a specific term (e.g. when to use "essential"), the relevant SuperMemory terminology note is now force-included in the chat context. Previously the knowledge-base retrieval selected terminology notes only by the open document's domain, client and language – never by your actual question – so a note could be silently skipped even though it existed. Three underlying issues were fixed:
+  - The user's chat message is now used to match terminology notes (by source term, target term or filename); a directly-asked-about note is given top priority so it is never dropped by the context size limit.
+  - The language-pair relevance signal was reading the wrong frontmatter key (`languages`/`source_language`) and so never matched real notes, which use `language_pair`. It now reads `language_pair` as well.
+  - The "include all terminology notes" fallback was gated to banks with 20 or fewer notes, so larger banks could end up contributing nothing. The size cap is removed; the token budget now does the limiting.
+
 ## [4.20.2] – 2026-05-21
 
 ### Fixed

@@ -128,7 +128,8 @@ namespace Supervertaler.Trados.Core
             string sourceLang,
             string targetLang,
             int tokenBudget = 24000,
-            string manualClientProfile = null)
+            string manualClientProfile = null,
+            string queryText = null)
         {
             if (!VaultExists) return null;
 
@@ -189,7 +190,7 @@ namespace Supervertaler.Trados.Core
             }
 
             // ── Step 4: Resolve terminology articles ────────────────
-            var termEntries = FindTerminologyArticles(ctx.ClientName, domain, sourceLang, targetLang);
+            var termEntries = FindTerminologyArticles(ctx.ClientName, domain, sourceLang, targetLang, queryText);
             foreach (var te in termEntries)
             {
                 var text = ReadFullArticle(te.FilePath);
@@ -343,11 +344,20 @@ namespace Supervertaler.Trados.Core
                 s.FileName.IndexOf("General", StringComparison.OrdinalIgnoreCase) >= 0);
         }
 
+        // Boost applied when the user's query (chat message / segment) explicitly
+        // mentions a term note's source/target term or filename. Large enough to
+        // dominate the client/domain/language signals so a directly-asked-about
+        // note ranks first and survives token-budget trimming.
+        private const int QueryMatchBoost = 100;
+
         private List<KbArticleIndex> FindTerminologyArticles(
-            string clientName, string domain, string sourceLang, string targetLang)
+            string clientName, string domain, string sourceLang, string targetLang,
+            string queryText = null)
         {
             var terms = _index.Where(e => e.Folder == "02_TERMINOLOGY").ToList();
             if (terms.Count == 0) return terms;
+
+            var queryLower = string.IsNullOrWhiteSpace(queryText) ? null : queryText.ToLowerInvariant();
 
             // Score each term article by relevance
             var scored = new List<(KbArticleIndex entry, int score)>();
@@ -355,6 +365,10 @@ namespace Supervertaler.Trados.Core
             foreach (var t in terms)
             {
                 int score = 0;
+
+                // Query match: the user explicitly mentioned this term. Dominant signal.
+                if (queryLower != null && QueryMentionsTerm(t, queryLower))
+                    score += QueryMatchBoost;
 
                 // Client match: +3 points
                 if (!string.IsNullOrEmpty(clientName))
@@ -373,9 +387,11 @@ namespace Supervertaler.Trados.Core
                         score += 2;
                 }
 
-                // Language match: +1 point
-                var langs = t.GetFrontmatter("languages") ??
-                    t.GetFrontmatter("source_language") ?? "";
+                // Language match: +1 point. Accept the keys real notes actually use
+                // (language_pair) alongside the older languages / source_language keys.
+                var langs = t.GetFrontmatter("languages")
+                    ?? t.GetFrontmatter("language_pair")
+                    ?? t.GetFrontmatter("source_language") ?? "";
                 if (!string.IsNullOrEmpty(sourceLang))
                 {
                     var srcShort = ExtractLangCode(sourceLang);
@@ -388,18 +404,39 @@ namespace Supervertaler.Trados.Core
                     scored.Add((t, score));
             }
 
-            // If nothing matched by client/domain/language, include all term articles
-            // (they're still useful general terminology)
-            if (scored.Count == 0 && terms.Count <= 20)
-            {
+            // If nothing matched by query/client/domain/language, fall back to all
+            // term articles (still useful general terminology). The token budget –
+            // not an arbitrary count cap – limits how many actually reach the prompt.
+            if (scored.Count == 0)
                 return terms;
-            }
 
             // Return sorted by relevance (highest first)
             return scored
                 .OrderByDescending(x => x.score)
                 .Select(x => x.entry)
                 .ToList();
+        }
+
+        /// <summary>
+        /// True if the user's (lower-cased) query text mentions this term note –
+        /// by its source term, target term, or filename. Candidates shorter than
+        /// 3 characters are ignored to avoid spurious matches on stop-words.
+        /// </summary>
+        private static bool QueryMentionsTerm(KbArticleIndex entry, string queryLower)
+        {
+            foreach (var candidate in new[]
+            {
+                entry.GetFrontmatter("term_source"),
+                entry.GetFrontmatter("term_target"),
+                Path.GetFileNameWithoutExtension(entry.FileName)
+            })
+            {
+                if (string.IsNullOrWhiteSpace(candidate)) continue;
+                var c = candidate.Trim().ToLowerInvariant();
+                if (c.Length >= 3 && queryLower.IndexOf(c, StringComparison.Ordinal) >= 0)
+                    return true;
+            }
+            return false;
         }
 
         private static string ExtractLangCode(string langDisplayName)
