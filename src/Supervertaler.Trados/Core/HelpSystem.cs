@@ -75,6 +75,7 @@ namespace Supervertaler.Trados.Core
             public const string AiProofreaderReports = "trados/ai-proofreader/#reports-tab";
             public const string ClipboardMode       = "trados/clipboard-mode/";
             public const string GeneratePrompt      = "trados/generate-prompt/";
+            public const string ImportExport       = "trados/import-export/";
 
             public const string TermbaseEditor      = "trados/termbase-management/";
 

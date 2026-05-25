@@ -795,10 +795,17 @@ namespace Supervertaler.Trados.Controls
                     }
                     break;
                 case 2:
+                    // Import / Export tab was inserted between Batch and
+                    // Reports in v4.20.7; Reports and SuperSearch indices
+                    // bumped accordingly.
+                    topic = HelpSystem.Topics.ImportExport;
+                    label = "Import / Export Help";
+                    break;
+                case 3:
                     topic = HelpSystem.Topics.AiProofreaderReports;
                     label = "Reports Help";
                     break;
-                case 3:
+                case 4:
                     topic = HelpSystem.Topics.SuperSearch;
                     label = "SuperSearch Help";
                     break;
@@ -844,8 +851,9 @@ namespace Supervertaler.Trados.Controls
                                 : _batchTranslateControl.CurrentMode == BatchMode.Proofread
                                     ? HelpSystem.Topics.AiProofreader
                                     : HelpSystem.Topics.BatchTranslate; break;
-                    case 2: topic = HelpSystem.Topics.AiProofreaderReports; break;
-                    case 3: topic = HelpSystem.Topics.SuperSearch; break;
+                    case 2: topic = HelpSystem.Topics.ImportExport; break;
+                    case 3: topic = HelpSystem.Topics.AiProofreaderReports; break;
+                    case 4: topic = HelpSystem.Topics.SuperSearch; break;
                     default: topic = HelpSystem.Topics.AiAssistantChat; break;
                 }
                 HelpSystem.OpenHelp(topic);

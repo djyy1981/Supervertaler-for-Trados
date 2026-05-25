@@ -1,5 +1,13 @@
 # Changelog
 
+## [4.20.17] – 2026-05-25
+
+### Fixed
+
+- **Help button on the Import / Export tab now opens the right page.** v4.20.16 put a brand-new "?" inside the Import / Export tab content (in addition to the panel-level "?" that's existed in the top-right of the Supervertaler Assistant pane for ages), AND the panel-level button still routed to the Reports help page because its tab-index switch hadn't been updated when Import / Export was inserted between Batch Operations and Reports (case 2 was still mapped to Reports, case 3 to SuperSearch, etc.). Two fixes in one commit:
+  - Removed the in-tab "?" button — the panel-level one is the right home for tab help, matching every other tab in the pane.
+  - Added `HelpSystem.Topics.ImportExport` and slotted it into both `OnHelpDropdown` and the F1 keyboard handler at the correct tab index (2), shifting Reports → 3 and SuperSearch → 4.
+
 ## [4.20.16] – 2026-05-25
 
 ### Added

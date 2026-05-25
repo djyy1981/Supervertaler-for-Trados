@@ -38,7 +38,6 @@ namespace Supervertaler.Trados.Controls
         private Label _lblFilesHeading;
         private Panel _pnlFiles;                       // scrollable container for the per-file checkbox rows
         private readonly List<CheckBox> _fileCheckBoxes = new List<CheckBox>();
-        private Button _btnHelp;                       // top-right "?" → opens help.supervertaler.com page
         private Button _btnSelectActive;
         private Button _btnSelectAll;
         private Button _btnSelectNone;
@@ -110,7 +109,12 @@ namespace Supervertaler.Trados.Controls
             int leftMargin = UiScale.Pixels(12);
             int y = UiScale.Pixels(10);
 
-            // ─── Header + contextual "?" help button ─────────────────
+            // ─── Header ──────────────────────────────────────────────
+            // The panel-level "?" button at the very top-right of the
+            // Supervertaler Assistant pane is tab-aware (see
+            // AiAssistantControl.OnHelpDropdown) and routes to
+            // HelpSystem.Topics.ImportExport when this tab is active —
+            // so we don't add a per-tab help button here.
             var lblHeader = new Label
             {
                 Text = "Import / Export",
@@ -120,47 +124,6 @@ namespace Supervertaler.Trados.Controls
                 ForeColor = Color.FromArgb(20, 20, 20)
             };
             Controls.Add(lblHeader);
-
-            // Help button: small circular "?" that opens the dedicated
-            // Import / Export help page on help.supervertaler.com. Pinned
-            // to the right edge of the panel via the Right anchor so it
-            // stays at the top-right corner as the tab resizes.
-            _btnHelp = new Button
-            {
-                Text = "?",
-                Location = new Point(0, y - UiScale.Pixels(2)),  // X assigned after width is known
-                Size = new Size(UiScale.Pixels(24), UiScale.Pixels(24)),
-                FlatStyle = FlatStyle.Flat,
-                Font = new Font("Segoe UI", UiScale.FontSize(10f), FontStyle.Bold),
-                ForeColor = Color.FromArgb(60, 90, 140),
-                BackColor = Color.FromArgb(240, 244, 250),
-                Cursor = Cursors.Hand,
-                TabStop = false,
-                Anchor = AnchorStyles.Top | AnchorStyles.Right,
-                UseVisualStyleBackColor = false
-            };
-            _btnHelp.FlatAppearance.BorderColor = Color.FromArgb(180, 200, 220);
-            _btnHelp.FlatAppearance.BorderSize = 1;
-            // Initial position. OnResize repositions it relative to the
-            // actual control width (the Right anchor then keeps it pinned
-            // as the user resizes).
-            _btnHelp.Location = new Point(
-                Math.Max(leftMargin + UiScale.Pixels(120), 540 - UiScale.Pixels(16) - _btnHelp.Width),
-                y - UiScale.Pixels(2));
-            _btnHelp.Click += (s, e) =>
-            {
-                try
-                {
-                    System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(
-                        "https://help.supervertaler.com/trados/import-export/")
-                    { UseShellExecute = true });
-                }
-                catch { /* nothing we can do if the browser launch fails */ }
-            };
-            var tipHelp = new ToolTip { AutoPopDelay = 10000, InitialDelay = 300 };
-            tipHelp.SetToolTip(_btnHelp, "Open the Import / Export help page (browser)");
-            Controls.Add(_btnHelp);
-
             y += UiScale.Pixels(28);
 
             var lblBlurb = new Label
@@ -580,16 +543,6 @@ namespace Supervertaler.Trados.Controls
 
             _lvHistory.Width = wAvail;
             _txtLog.Width = wAvail;
-
-            // Pin the "?" help button to the top-right corner. Anchor =
-            // Top|Right alone preserves the right-distance from the
-            // initial layout, but the initial layout uses a fallback
-            // width — this corrects it to the real control width.
-            if (_btnHelp != null)
-            {
-                _btnHelp.Left = Math.Max(UiScale.Pixels(160),
-                    Width - UiScale.Pixels(16) - _btnHelp.Width);
-            }
         }
 
         // ─── Public API ───────────────────────────────────────────────
