@@ -6382,10 +6382,16 @@ Always list the original source filename(s) in the `sources:` frontmatter field.
                 // column by the renderers.
                 bool includeLocked = ctrl.IncludeLockedSegments;
 
+                // v4.20.24: honour the confirmation-status checkboxes.
+                // If the user has ticked specific statuses, the collector
+                // filters segments accordingly. An empty / null set means
+                // "no filter — include every status".
+                var statusFilter = ctrl.GetSelectedStatuses();
+
                 List<Core.Export.ExportSegment> segments;
                 try
                 {
-                    segments = CollectBilingualExportSegments(filter, includeLocked);
+                    segments = CollectBilingualExportSegments(filter, includeLocked, statusFilter);
                 }
                 catch (Exception ex)
                 {
@@ -6880,7 +6886,8 @@ Always list the original source filename(s) in the `sources:` frontmatter field.
                               (string.IsNullOrEmpty(sourceFileName) ? "" : " — " + Path.GetFileNameWithoutExtension(sourceFileName)),
                 SourceFileName = sourceFileName ?? "",
                 ToolVersion = src.ToolVersion,
-                IncludeLocked = src.IncludeLocked
+                IncludeLocked = src.IncludeLocked,
+                IncludedStatuses = src.IncludedStatuses
             };
         }
 
@@ -7166,7 +7173,8 @@ Always list the original source filename(s) in the `sources:` frontmatter field.
         /// in the manifest.</summary>
         private List<Core.Export.ExportSegment> CollectBilingualExportSegments(
             HashSet<string> fileIdFilter = null,
-            bool includeLocked = true)
+            bool includeLocked = true,
+            HashSet<string> statusFilter = null)
         {
             var result = new List<Core.Export.ExportSegment>();
             if (_activeDocument == null) return result;
@@ -7258,6 +7266,18 @@ Always list the original source filename(s) in the `sources:` frontmatter field.
                     status = pair.Properties?.ConfirmationLevel.ToString() ?? "";
                 }
                 catch { }
+
+                // v4.20.24: confirmation-status filter. When the user has
+                // ticked specific statuses in the UI, skip any segment
+                // whose status isn't in the chosen set. Empty / null
+                // filter = include everything (matches pre-v4.20.24
+                // behaviour). Comparison is case-insensitive on the
+                // enum's ToString() form.
+                if (statusFilter != null && statusFilter.Count > 0
+                    && !statusFilter.Contains(status ?? ""))
+                {
+                    continue;
+                }
 
                 // Detect paragraph-level formatting (Heading 1 bold, whole-
                 // paragraph italic, etc.) so the bilingual file can render

@@ -1,5 +1,16 @@
 # Changelog
 
+## [4.20.24] – 2026-05-26
+
+### Fixed
+
+- **Bracketed `[SEGMENT NNNN]` Markdown re-import: segments with empty target on export now round-trip correctly.** A user with a multi-file project where many segments were untranslated noticed that some edits made to those rows didn't land in Trados after re-import. Root cause: the lang-line regex used `\s*` after the colon for trailing whitespace, but .NET treats `\s` as matching newlines too — so on a line like `NL: \n` the engine would greedily consume the newline AND the next line, capturing `Status: Unspecified` (etc.) as the body instead of the intended empty string. Subsequent re-import then either wrote the wrong content back or compared against the wrong baseline. Tightened the regex to `[ \t]*` so matching stays on the current line. Also made target selection more tolerant: the parser now picks the **last** non-`Status` lang-line in each block as the target (rather than the second), so a proofreader who edits by inserting an extra `NL: …` line after the empty placeholder still gets their actual translation captured rather than the empty line.
+
+### Added
+
+- **New confirmation-status filter on the Import/Export tab.** Six checkboxes (one per Trados `ConfirmationLevel` value: *Unspecified*, *Draft*, *Translated*, *Approved (translation)*, *Approved (sign-off)*, *Rejected*) let the user restrict the export to only segments in selected statuses. All checked (the default) = no filter, every segment included — matches pre-v4.20.24 behaviour. Unticking any subset narrows the export accordingly. Composes orthogonally with the existing **Include locked segments** option and the multi-file file-selection list.
+
+
 ## [4.20.23] – 2026-05-25
 
 ### Changed

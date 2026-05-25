@@ -34,9 +34,15 @@ namespace Supervertaler.Trados.Core.Export
         // v4.20.20: bracketed-layout anchors. The number is zero-padded
         // (e.g. "0001") but the regex accepts any digit run for safety.
         private static readonly Regex BracketedAnchorRe = new Regex(@"^\[SEGMENT\s+(\d+)\]\s*$", RegexOptions.IgnoreCase | RegexOptions.Multiline);
-        // Within a bracketed block: a line that starts with 2 letters,
-        // a colon, then the text. Captures (lang-code, body).
-        private static readonly Regex BracketedLangLineRe = new Regex(@"^([A-Za-z]{2,3}):\s*(.*)$", RegexOptions.Multiline);
+        // Within a bracketed block: a line that starts with 2-3 letters,
+        // a colon, optional spaces/tabs, then the body. Captures (lang-
+        // code, body). v4.20.24: was `\s*` for the post-colon whitespace,
+        // which .NET treats as matching newlines too — meaning on a line
+        // like "NL: \n" (empty body) the engine would consume the newline
+        // and then match (.*) against the NEXT line, falsely capturing
+        // "Status: Unspecified" (etc.) as the body. Using [ \t]* keeps
+        // the match anchored to the current line.
+        private static readonly Regex BracketedLangLineRe = new Regex(@"^([A-Za-z]{2,3}):[ \t]*(.*)$", RegexOptions.Multiline);
 
         public List<ImportedSegment> Parse(string filePath)
         {
@@ -90,22 +96,46 @@ namespace Supervertaler.Trados.Core.Export
                 int number = anchors[i].Value;
                 var blockText = text.Substring(blockStart, blockEnd - blockStart);
 
-                // First two ANY-language colon-prefixed lines = source then target.
-                // Status: lines are skipped from source/target capture (matched
-                // separately further down).
-                string sourceBody = null;
-                string targetBody = null;
+                // v4.20.24: collect every non-"Status" lang-line in the
+                // block in order; first = source, LAST = target. Picking
+                // the last (rather than the second) is robust against
+                // proofreaders who edit by inserting extra lines instead
+                // of replacing the empty target placeholder — e.g.
+                //   EN: source
+                //   NL:
+                //   NL: my actual translation here
+                // The user's actual translation always wins. Source
+                // languages 2-3 letters; the renderer also emits a
+                // "Status: …" line, but that's 6 letters so the
+                // BracketedLangLineRe regex skips it naturally.
+                var langBodies = new List<string>(4);
                 foreach (Match lm in BracketedLangLineRe.Matches(blockText))
                 {
                     var code = lm.Groups[1].Value.Trim();
-                    var body = lm.Groups[2].Value.Trim();
-                    // Skip the "Status" pseudo-prefix the renderer emits.
                     if (string.Equals(code, "Status", System.StringComparison.OrdinalIgnoreCase))
                         continue;
-                    if (sourceBody == null) { sourceBody = body; continue; }
-                    if (targetBody == null) { targetBody = body; break; }
+                    langBodies.Add(lm.Groups[2].Value.Trim());
                 }
-                if (targetBody == null) continue; // need at least a target
+                string sourceBody;
+                string targetBody;
+                if (langBodies.Count >= 2)
+                {
+                    sourceBody = langBodies[0];
+                    targetBody = langBodies[langBodies.Count - 1];
+                }
+                else if (langBodies.Count == 1)
+                {
+                    // Only one lang-line in the block — best-effort
+                    // treat it as the target. Source stays empty; the
+                    // diff path skips the source-tamper check when the
+                    // file omits the source.
+                    sourceBody = "";
+                    targetBody = langBodies[0];
+                }
+                else
+                {
+                    continue; // no recognisable lang-lines, skip
+                }
 
                 var seg = new ImportedSegment
                 {

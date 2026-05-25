@@ -64,5 +64,15 @@ namespace Supervertaler.Trados.Core.Export
         /// compatible with the pre-v4.20.18 behaviour, which always
         /// included locked segments but didn't flag them).</summary>
         public bool IncludeLocked { get; set; } = true;
+
+        /// <summary>v4.20.24: optional confirmation-status filter. When
+        /// non-empty, only segments whose <c>ConfirmationLevel</c> name
+        /// (e.g. "Translated", "ApprovedTranslation", "Draft") is in the
+        /// set are included in the export. Empty (the default) = no
+        /// filter, every segment is included regardless of status — same
+        /// as pre-v4.20.24 behaviour. Comparison is case-insensitive on
+        /// the enum's <c>ToString()</c> form.</summary>
+        public System.Collections.Generic.HashSet<string> IncludedStatuses { get; set; }
+            = new System.Collections.Generic.HashSet<string>(System.StringComparer.OrdinalIgnoreCase);
     }
 }

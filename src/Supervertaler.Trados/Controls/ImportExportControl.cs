@@ -32,6 +32,7 @@ namespace Supervertaler.Trados.Controls
         private ComboBox _cmbLayout;
         private CheckBox _chkStrictTagCheck;
         private CheckBox _chkIncludeLocked;
+        private System.Collections.Generic.List<CheckBox> _statusCheckBoxes;
         private Label _lblSegmentCount;
 
         // Multi-file controls (shown only when active document contains
@@ -271,6 +272,60 @@ namespace Supervertaler.Trados.Controls
                 "should only see what's actually still editable.");
             Controls.Add(_chkIncludeLocked);
             y += UiScale.Pixels(24);
+
+            // v4.20.24: confirmation-status filter. A row of checkboxes —
+            // one per Trados ConfirmationLevel — that lets the user
+            // include only segments in chosen statuses. All checked by
+            // default = no filter (same as pre-v4.20.24 behaviour). The
+            // labels here MUST match what pair.Properties.ConfirmationLevel
+            // .ToString() returns at export time, since the collector
+            // compares them verbatim (case-insensitive).
+            var lblStatuses = new Label
+            {
+                Text = "Statuses to include in export:",
+                Location = new Point(leftMargin, y),
+                AutoSize = true,
+                Font = new Font("Segoe UI", UiScale.FontSize(9f), FontStyle.Bold),
+                ForeColor = labelColor
+            };
+            Controls.Add(lblStatuses);
+            y += UiScale.Pixels(20);
+
+            // Two rows of 3 checkboxes. Order matches the Trados
+            // ConfirmationLevel enum's natural progression — unconfirmed
+            // → reviewed → signed off → rejected as an outlier.
+            string[] statusEnumNames = {
+                "Unspecified", "Draft", "Translated",
+                "ApprovedTranslation", "ApprovedSignOff", "Rejected"
+            };
+            string[] statusLabels = {
+                "Unspecified", "Draft", "Translated",
+                "Approved (translation)", "Approved (sign-off)", "Rejected"
+            };
+            _statusCheckBoxes = new System.Collections.Generic.List<CheckBox>();
+            int colWidth = UiScale.Pixels(180);
+            int rowHeight = UiScale.Pixels(22);
+            for (int i = 0; i < statusEnumNames.Length; i++)
+            {
+                int col = i % 3;
+                int row = i / 3;
+                var cb = new CheckBox
+                {
+                    Text = statusLabels[i],
+                    Tag = statusEnumNames[i],   // raw enum name for comparison
+                    Location = new Point(leftMargin + col * colWidth, y + row * rowHeight),
+                    AutoSize = true,
+                    Checked = true,
+                    Font = bodyFont,
+                    ForeColor = labelColor,
+                    TabStop = false,
+                    FlatStyle = FlatStyle.System,
+                    UseVisualStyleBackColor = true
+                };
+                Controls.Add(cb);
+                _statusCheckBoxes.Add(cb);
+            }
+            y += rowHeight * 2 + UiScale.Pixels(6);
 
             // ─── Multi-file controls (hidden when single-file) ───────
             // Trados projects can have many files; users can also open
@@ -589,6 +644,38 @@ namespace Supervertaler.Trados.Controls
         /// they're exported and visually marked with 🔒 in the Status
         /// column. Default true.</summary>
         public bool IncludeLockedSegments => _chkIncludeLocked?.Checked ?? true;
+
+        /// <summary>v4.20.24: returns the set of checked confirmation-
+        /// status enum names (e.g. {"Translated", "ApprovedTranslation"}).
+        /// When ALL checkboxes are checked, returns an empty set —
+        /// signalling "no status filter, include everything" to the
+        /// collector (matches pre-v4.20.24 behaviour). When SOME are
+        /// checked, returns just the checked names. When NONE are
+        /// checked, returns the sentinel singleton {"__none__"} so the
+        /// collector matches against nothing and the export comes out
+        /// empty (predictable outcome rather than the implicit
+        /// "no filter" interpretation).</summary>
+        public HashSet<string> GetSelectedStatuses()
+        {
+            var set = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            if (_statusCheckBoxes == null) return set;
+            int total = _statusCheckBoxes.Count;
+            int checkedCount = 0;
+            foreach (var cb in _statusCheckBoxes)
+            {
+                if (cb.Checked)
+                {
+                    checkedCount++;
+                    var name = cb.Tag as string;
+                    if (!string.IsNullOrEmpty(name)) set.Add(name);
+                }
+            }
+            // All checked → no filter (empty set).
+            if (checkedCount == total) set.Clear();
+            // None checked → sentinel that never matches.
+            else if (checkedCount == 0) { set.Clear(); set.Add("__none__"); }
+            return set;
+        }
 
         /// <summary>Multi-file output mode. SeparatePerFile = produce one
         /// DOCX per selected file; CombineOne = one DOCX containing all
