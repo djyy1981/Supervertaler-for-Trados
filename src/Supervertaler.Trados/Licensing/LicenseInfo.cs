@@ -34,8 +34,16 @@ namespace Supervertaler.Trados.Licensing
         public string InstanceId { get; set; } = "";
 
         /// <summary>
-        /// Variant name from Lemon Squeezy (meta.variant_name).
-        /// Maps to a <see cref="LicenseTier"/>: "TermLens" → Tier1, "Supervertaler Assistant" → AssistantOnly, "TermLens + Supervertaler Assistant" → Tier2.
+        /// Variant name from Lemon Squeezy (meta.variant_name). With the
+        /// single-product layout introduced in v4.18.48 (and the product
+        /// rename to "Supervertaler for Trados" in v4.20.23), this field
+        /// is captured for display in the License panel — it tells the
+        /// user what they bought — but no longer drives feature gating.
+        /// Any valid key returns <see cref="LicenseTier.Licensed"/>; see
+        /// <c>LicenseManager.MapVariantToTier</c>. Old multi-tier license
+        /// cache files ("TermLens", "TermLens + Supervertaler Assistant",
+        /// "Supervertaler Assistant") still deserialise cleanly into this
+        /// field and unlock everything.
         /// </summary>
         [DataMember(Name = "variantName")]
         public string VariantName { get; set; } = "";

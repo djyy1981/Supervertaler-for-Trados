@@ -36,13 +36,15 @@ namespace Supervertaler.Trados.Licensing
         private const int OfflineCacheDays = 30;
         private const int TrialDays = LicenseInfo.TrialDays;
 
-        /// <summary>
-        /// Lemon Squeezy variant names – must match exactly what's configured
-        /// in the Lemon Squeezy dashboard.
-        /// </summary>
-        private const string VariantTier1 = "TermLens";
-        private const string VariantTier2 = "TermLens + Supervertaler Assistant";
-        private const string VariantAssistant = "Supervertaler Assistant";
+        // v4.20.23: removed the legacy VariantTier1 / VariantTier2 /
+        // VariantAssistant constants. They were never referenced anywhere
+        // (MapVariantToTier always returns Licensed regardless), and they
+        // documented a multi-tier product layout (TermLens / Assistant /
+        // bundle) that no longer exists on Lemon Squeezy — the store now
+        // sells a single product called "Supervertaler for Trados". The
+        // license response's variant_name field still flows through to
+        // LicenseInfo.VariantName for display in the License panel; it
+        // just doesn't gate any features.
 
         // ─── State ──────────────────────────────────────────────────
 
@@ -332,7 +334,12 @@ namespace Supervertaler.Trados.Licensing
         /// <summary>
         /// Maps a Lemon Squeezy variant name to a license tier.
         /// Since v4.18.48, all variants grant full access (single-tier model).
-        /// The variant name is still stored for display but no longer affects feature gating.
+        /// Since v4.20.23, Lemon Squeezy only sells one product anyway
+        /// ("Supervertaler for Trados"); the variant_name is captured for
+        /// display in the License panel but no longer affects feature
+        /// gating. Kept as a method (rather than inlined) so future
+        /// variant-aware product layouts can re-introduce gating here
+        /// without touching the caller.
         /// </summary>
         private static LicenseTier MapVariantToTier(string variantName)
         {

@@ -1,5 +1,16 @@
 # Changelog
 
+## [4.20.23] – 2026-05-25
+
+### Changed
+
+- **Cleaned up stale license-tier documentation** to match Lemon Squeezy's current single-product layout. The store now sells exactly one product, **Supervertaler for Trados**, and has done since the multi-tier model was dropped in v4.18.48. Three things touched, no behavioural change (licence validation has been variant-name-agnostic since v4.18.48):
+  - Removed three dead constants from `LicenseManager.cs` (`VariantTier1 = "TermLens"`, `VariantTier2 = "TermLens + Supervertaler Assistant"`, `VariantAssistant = "Supervertaler Assistant"`). They were never referenced — `MapVariantToTier()` ignores the variant name entirely and always returns `LicenseTier.Licensed` for any valid key.
+  - Updated `MapVariantToTier()`'s XML doc comment to note the single-product Lemon Squeezy layout.
+  - Updated `LicenseInfo.VariantName`'s XML doc comment, which previously documented the legacy "TermLens → Tier1" mapping table.
+- Old cached `license.json` files from previous installations (with `VariantName` set to any of the legacy strings) still deserialise cleanly and unlock everything.
+
+
 ## [4.20.22] – 2026-05-25
 
 ### Fixed
