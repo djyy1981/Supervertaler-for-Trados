@@ -55,19 +55,77 @@ namespace Supervertaler.Trados.TranslationProviders
             _languagePair = languagePair ?? throw new ArgumentNullException(nameof(languagePair));
             _tmInfo = tmInfo;
             _dbPath = dbPath;
+            try
+            {
+                TmBridgeLog.Info(
+                    "LanguageDirection ctor: TM=" + (tmInfo != null ? tmInfo.Name : "(null)") +
+                    ", langPair=" + (languagePair.SourceCulture.Name ?? "(empty)") +
+                    "->" + (languagePair.TargetCulture.Name ?? "(empty)"));
+            }
+            catch (Exception ex)
+            {
+                TmBridgeLog.Error("LanguageDirection ctor: log line threw (continuing anyway)", ex);
+            }
         }
 
         // ─── Identity ─────────────────────────────────────────────────
 
-        public ITranslationProvider TranslationProvider => _provider;
-        public CultureCode SourceLanguage => _languagePair.SourceCulture;
-        public CultureCode TargetLanguage => _languagePair.TargetCulture;
-        public bool CanReverseLanguageDirection => false;
+        public ITranslationProvider TranslationProvider
+        {
+            get
+            {
+                TmBridgeLog.Info("LanguageDirection.TranslationProvider get => " + (_provider == null ? "(null!)" : "OK"));
+                return _provider;
+            }
+        }
+        public CultureCode SourceLanguage
+        {
+            get
+            {
+                try
+                {
+                    var c = _languagePair.SourceCulture;
+                    TmBridgeLog.Info("LanguageDirection.SourceLanguage get => " + (c.Name ?? "(empty)"));
+                    return c;
+                }
+                catch (Exception ex)
+                {
+                    TmBridgeLog.Error("LanguageDirection.SourceLanguage get: threw", ex);
+                    throw;
+                }
+            }
+        }
+        public CultureCode TargetLanguage
+        {
+            get
+            {
+                try
+                {
+                    var c = _languagePair.TargetCulture;
+                    TmBridgeLog.Info("LanguageDirection.TargetLanguage get => " + (c.Name ?? "(empty)"));
+                    return c;
+                }
+                catch (Exception ex)
+                {
+                    TmBridgeLog.Error("LanguageDirection.TargetLanguage get: threw", ex);
+                    throw;
+                }
+            }
+        }
+        public bool CanReverseLanguageDirection
+        {
+            get
+            {
+                TmBridgeLog.Info("LanguageDirection.CanReverseLanguageDirection => false");
+                return false;
+            }
+        }
 
         // ─── Search: exact (SearchSegment) ────────────────────────────
 
         public SearchResults SearchSegment(SearchSettings settings, Segment segment)
         {
+            TmBridgeLog.Info("SearchSegment ENTRY: segment=" + (segment == null ? "(null)" : Truncate(segment.ToPlain() ?? "(empty)", 60)));
             // Defensive: Studio occasionally passes null segments in
             // exploratory pre-flight calls. Returning an empty SearchResults
             // is the documented correct behaviour – throwing here causes

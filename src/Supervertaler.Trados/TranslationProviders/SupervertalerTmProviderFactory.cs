@@ -34,6 +34,9 @@ namespace Supervertaler.Trados.TranslationProviders
             string translationProviderState,
             ITranslationProviderCredentialStore credentialStore)
         {
+            TranslationProviders.TmBridgeLog.Info(
+                "Factory.CreateTranslationProvider: uri=" + (translationProviderUri == null ? "(null)" : translationProviderUri.ToString()));
+
             if (!SupportsTranslationProviderUri(translationProviderUri))
                 throw new ArgumentException(
                     "URI does not match the Supervertaler TM scheme.",
@@ -42,6 +45,11 @@ namespace Supervertaler.Trados.TranslationProviders
             var tmId = SupervertalerTmProvider.ExtractTmIdFromUri(translationProviderUri);
             var dbPath = ResolveDbPath();
             var tmInfo = ResolveTmInfo(dbPath, tmId);
+
+            TranslationProviders.TmBridgeLog.Info(
+                "Factory.CreateTranslationProvider: resolved tmId=" + (tmId ?? "(null)") +
+                ", dbPath=" + (dbPath ?? "(null)") +
+                ", tmInfo=" + (tmInfo == null ? "NOT FOUND in bridged TMs" : "OK"));
 
             // We deliberately return the provider even when tmInfo is null
             // (TM no longer bridged / missing). The provider then surfaces

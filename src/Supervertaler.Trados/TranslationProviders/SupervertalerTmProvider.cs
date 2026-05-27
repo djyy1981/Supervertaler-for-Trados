@@ -62,40 +62,88 @@ namespace Supervertaler.Trados.TranslationProviders
             _uri = uri ?? throw new ArgumentNullException(nameof(uri));
             _tmInfo = tmInfo;
             _dbPath = dbPath;
+            TmBridgeLog.Info(
+                "Provider ctor: uri=" + uri +
+                ", tmInfo=" + (tmInfo == null ? "null" : (tmInfo.Name + " (" + tmInfo.TmId + ", " + tmInfo.SourceLang + "->" + tmInfo.TargetLang + ", " + tmInfo.EntryCount + " TUs)")) +
+                ", dbPath=" + (dbPath ?? "(null)"));
         }
 
         // ─── Identity ─────────────────────────────────────────────────
 
-        public Uri Uri => _uri;
+        public Uri Uri
+        {
+            get
+            {
+                TmBridgeLog.Info("Provider.Uri get => " + (_uri == null ? "(null)" : _uri.ToString()));
+                return _uri;
+            }
+        }
 
-        public string Name =>
-            _tmInfo != null
-                ? "Supervertaler TM: " + _tmInfo.Name
-                : "Supervertaler TM (not found)";
+        public string Name
+        {
+            get
+            {
+                var n = _tmInfo != null
+                    ? "Supervertaler TM: " + _tmInfo.Name
+                    : "Supervertaler TM (not found)";
+                TmBridgeLog.Info("Provider.Name get => " + n);
+                return n;
+            }
+        }
 
-        public TranslationMethod TranslationMethod => TranslationMethod.TranslationMemory;
+        public TranslationMethod TranslationMethod
+        {
+            get
+            {
+                TmBridgeLog.Info("Provider.TranslationMethod get => TranslationMemory");
+                return TranslationMethod.TranslationMemory;
+            }
+        }
 
-        public bool IsReadOnly => true;
+        public bool IsReadOnly
+        {
+            get
+            {
+                TmBridgeLog.Info("Provider.IsReadOnly get => true");
+                return true;
+            }
+        }
 
         public ProviderStatusInfo StatusInfo
         {
             get
             {
-                if (_tmInfo == null)
-                    return new ProviderStatusInfo(false,
-                        "The Supervertaler TM '" + ExtractTmIdFromUri(_uri) +
-                        "' is no longer marked as Bridged in Supervertaler Workbench.");
-                if (string.IsNullOrEmpty(_dbPath) || !File.Exists(_dbPath))
-                    return new ProviderStatusInfo(false,
-                        "Supervertaler database not found at " + (_dbPath ?? "(unset)") +
-                        ". Open Supervertaler Workbench at least once to create it.");
-                return new ProviderStatusInfo(true,
-                    "Bridged from Supervertaler Workbench (" + _tmInfo.EntryCount + " entries)");
+                try
+                {
+                    if (_tmInfo == null)
+                    {
+                        TmBridgeLog.Info("Provider.StatusInfo get => Unavailable (no TmInfo)");
+                        return new ProviderStatusInfo(false,
+                            "The Supervertaler TM '" + ExtractTmIdFromUri(_uri) +
+                            "' is no longer marked as Bridged in Supervertaler Workbench.");
+                    }
+                    if (string.IsNullOrEmpty(_dbPath) || !File.Exists(_dbPath))
+                    {
+                        TmBridgeLog.Info("Provider.StatusInfo get => Unavailable (db missing: " + (_dbPath ?? "(null)") + ")");
+                        return new ProviderStatusInfo(false,
+                            "Supervertaler database not found at " + (_dbPath ?? "(unset)") +
+                            ". Open Supervertaler Workbench at least once to create it.");
+                    }
+                    TmBridgeLog.Info("Provider.StatusInfo get => Available (" + _tmInfo.EntryCount + " entries)");
+                    return new ProviderStatusInfo(true,
+                        "Bridged from Supervertaler Workbench (" + _tmInfo.EntryCount + " entries)");
+                }
+                catch (Exception ex)
+                {
+                    TmBridgeLog.Error("Provider.StatusInfo get: threw", ex);
+                    return new ProviderStatusInfo(false, "Error: " + ex.Message);
+                }
             }
         }
 
         public void RefreshStatusInfo()
         {
+            TmBridgeLog.Info("Provider.RefreshStatusInfo()");
             // StatusInfo is computed on demand from _tmInfo + disk state, so
             // there's nothing to refresh proactively. Workbench's writer side
             // owns the freshness story.
@@ -112,40 +160,96 @@ namespace Supervertaler.Trados.TranslationProviders
         //
         // Conservative set for v1 – everything not implemented yet is OFF
         // so Studio doesn't surface UI promising features that aren't there.
+        //
+        // v4.20.29: SupportsTranslation is now FALSE. SDK convention: a
+        // `true` value advertises this as an *automated translation*
+        // (MT-style) provider, prompting Studio to invoke a translation-
+        // engine code path that doesn't exist for a TM lookup provider.
+        // That mismatch was producing the "Object reference not set to an
+        // instance of an object" failures observed in v4.20.28 – Studio
+        // would call SupportsLanguageDirection / GetLanguageDirection in
+        // a tight loop without ever reaching SearchSegment.
+        //
+        // Every getter is also instrumented so future regressions can be
+        // diagnosed from %TEMP%\supervertaler-tm-bridge.log alone.
 
-        public bool SupportsTaggedInput => false;
-        public bool SupportsScoring => true;          // we return ScoringResult on hits
-        public bool SupportsSearchForTranslationUnits => true;
-        public bool SupportsMultipleResults => true;
-        public bool SupportsFilters => false;
-        public bool SupportsPenalties => false;
-        public bool SupportsStructureContext => false;
-        public bool SupportsDocumentSearches => false;
-        public bool SupportsUpdate => false;          // Phase 3
-        public bool SupportsPlaceables => false;
-        public bool SupportsTranslation => true;
-        public bool SupportsFuzzySearch => false;     // Phase 3
-        public bool SupportsConcordanceSearch => true;
-        public bool SupportsSourceConcordanceSearch => true;
-        public bool SupportsTargetConcordanceSearch => true;
-        public bool SupportsWordCounts => false;
+        public bool SupportsTaggedInput { get { TmBridgeLog.Info("Provider.SupportsTaggedInput => false"); return false; } }
+        public bool SupportsScoring { get { TmBridgeLog.Info("Provider.SupportsScoring => true"); return true; } }
+        public bool SupportsSearchForTranslationUnits { get { TmBridgeLog.Info("Provider.SupportsSearchForTranslationUnits => true"); return true; } }
+        public bool SupportsMultipleResults { get { TmBridgeLog.Info("Provider.SupportsMultipleResults => true"); return true; } }
+        public bool SupportsFilters { get { TmBridgeLog.Info("Provider.SupportsFilters => false"); return false; } }
+        public bool SupportsPenalties { get { TmBridgeLog.Info("Provider.SupportsPenalties => false"); return false; } }
+        public bool SupportsStructureContext { get { TmBridgeLog.Info("Provider.SupportsStructureContext => false"); return false; } }
+        public bool SupportsDocumentSearches { get { TmBridgeLog.Info("Provider.SupportsDocumentSearches => false"); return false; } }
+        public bool SupportsUpdate { get { TmBridgeLog.Info("Provider.SupportsUpdate => false"); return false; } }
+        public bool SupportsPlaceables { get { TmBridgeLog.Info("Provider.SupportsPlaceables => false"); return false; } }
+        public bool SupportsTranslation { get { TmBridgeLog.Info("Provider.SupportsTranslation => false"); return false; } }
+        public bool SupportsFuzzySearch { get { TmBridgeLog.Info("Provider.SupportsFuzzySearch => false"); return false; } }
+        public bool SupportsConcordanceSearch { get { TmBridgeLog.Info("Provider.SupportsConcordanceSearch => true"); return true; } }
+        public bool SupportsSourceConcordanceSearch { get { TmBridgeLog.Info("Provider.SupportsSourceConcordanceSearch => true"); return true; } }
+        public bool SupportsTargetConcordanceSearch { get { TmBridgeLog.Info("Provider.SupportsTargetConcordanceSearch => true"); return true; } }
+        public bool SupportsWordCounts { get { TmBridgeLog.Info("Provider.SupportsWordCounts => false"); return false; } }
 
         // ─── Language direction routing ──────────────────────────────
 
         public bool SupportsLanguageDirection(LanguagePair languageDirection)
         {
-            if (_tmInfo == null || languageDirection == null) return false;
-            // Match on the leading sub-language tag only ("en" matches "en-US",
-            // "en-GB" etc.) – Workbench's locale storage is loose (sometimes a
-            // bare ISO code, sometimes a full BCP-47) so a strict match would
-            // reject legitimate pairs constantly.
-            return CulturesCompatible(_tmInfo.SourceLang, languageDirection.SourceCulture.Name)
-                && CulturesCompatible(_tmInfo.TargetLang, languageDirection.TargetCulture.Name);
+            try
+            {
+                if (_tmInfo == null)
+                {
+                    TmBridgeLog.Warn("SupportsLanguageDirection: _tmInfo is null");
+                    return false;
+                }
+                if (languageDirection == null)
+                {
+                    TmBridgeLog.Warn("SupportsLanguageDirection: languageDirection is null");
+                    return false;
+                }
+
+                // CultureCode might be a reference type in some Trados SDK
+                // versions; guard against null SourceCulture/TargetCulture
+                // before calling .Name on them.
+                string src = SafeGetCultureName(languageDirection.SourceCulture);
+                string tgt = SafeGetCultureName(languageDirection.TargetCulture);
+
+                bool ok = CulturesCompatible(_tmInfo.SourceLang, src)
+                       && CulturesCompatible(_tmInfo.TargetLang, tgt);
+
+                TmBridgeLog.Info(
+                    "SupportsLanguageDirection: TM=" + _tmInfo.Name +
+                    " (" + _tmInfo.SourceLang + "->" + _tmInfo.TargetLang +
+                    ") vs project (" + src + "->" + tgt + ") => " + ok);
+                return ok;
+            }
+            catch (Exception ex)
+            {
+                TmBridgeLog.Error("SupportsLanguageDirection: threw", ex);
+                return false;
+            }
         }
 
         public ITranslationProviderLanguageDirection GetLanguageDirection(LanguagePair languageDirection)
         {
+            TmBridgeLog.Info(
+                "GetLanguageDirection: TM=" + (_tmInfo != null ? _tmInfo.Name : "(null TmInfo)") +
+                ", langPair=" + (languageDirection == null ? "(null)"
+                    : SafeGetCultureName(languageDirection.SourceCulture) + "->" + SafeGetCultureName(languageDirection.TargetCulture)));
             return new SupervertalerTmLanguageDirection(this, languageDirection, _tmInfo, _dbPath);
+        }
+
+        private static string SafeGetCultureName(CultureCode c)
+        {
+            try
+            {
+                // CultureCode is a struct in current Trados SDKs but treat
+                // it defensively: .Name could theoretically be null.
+                return c.Name ?? "(empty)";
+            }
+            catch
+            {
+                return "(error)";
+            }
         }
 
         // ─── Helpers ──────────────────────────────────────────────────

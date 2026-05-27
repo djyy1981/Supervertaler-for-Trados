@@ -1,5 +1,17 @@
 # Changelog
 
+## [4.20.29] – 2026-05-27
+
+### Fixed (Shared TM Bridge: root cause of the "Object reference" NRE)
+
+- **`SupportsTranslation` now reports `false`.** The previous v4.20.26/v4.20.27 builds advertised the bridge as `SupportsTranslation = true`, which in the Trados SDK signals an **automated-translation (MT-style) provider** rather than a TM lookup provider. With that flag on, Trados Studio invoked an MT-engine code path that doesn't exist for this provider, and the resulting NRE bubbled up to the UI as "An error has occurred while using the translation provider Supervertaler TM: <name>: Object reference not set to an instance of an object." on every segment, with no entry in our own log because the failure happened *inside* Trados before `SearchSegment` was reached. Stock SDLTM providers report `false` for the same reason; the bridge now matches that convention.
+- **Comprehensive property-getter instrumentation** on both `SupervertalerTmProvider` and `SupervertalerTmLanguageDirection`. Every capability flag, every identity property, and every culture accessor logs on read to `%TEMP%\supervertaler-tm-bridge.log`. If a future build sees the bridge polled in a tight loop without ever reaching search, the log now pinpoints exactly which read Studio is making before giving up.
+
+### What translators see
+
+- Bridged Supervertaler Workbench TMs now actually return hits in the Trados TM-results pane and Concordance window. The same loose-locale matching from v4.20.26 (so `nl` matches `nl-NL`) applies.
+
+
 ## [4.20.27] – 2026-05-27
 
 ### Fixed (Shared TM Bridge: defensive null-handling + diagnostics for "Object reference" errors)
