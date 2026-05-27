@@ -179,6 +179,7 @@ namespace Supervertaler.Trados.TranslationProviders
                     }
 
                     var matches = reader.SearchExact(_tmInfo.TmId, queryText, MaxExactResults);
+                    SafeLog("SearchSegment: TM=" + _tmInfo.TmId + " query='" + Truncate(queryText, 60) + "' returned " + matches.Count + " exact matches");
                     foreach (var m in matches)
                     {
                         var sr = TryBuildSearchResult(m);
@@ -277,29 +278,34 @@ namespace Supervertaler.Trados.TranslationProviders
         public SearchResults SearchTranslationUnit(SearchSettings settings, TranslationUnit translationUnit)
         {
             SafeLog("LanguageDirection.SearchTranslationUnit ENTRY");
-            // Studio uses this for target-side concordance when the user
-            // searches for text that should appear in the *target* of an
-            // existing TU. Decide which side to search by checking which
-            // segment the caller populated.
-            //
-            // v4.20.31: SourceSegment on the returned SearchResults must
-            // never be null – seed it from the TU's source segment.
+            // v4.20.32: this method is segment-level EXACT match in a
+            // document-search context (Studio's normal segment lookup
+            // routes through SearchTranslationUnitsMasked → here when it
+            // wants to pass extra context via the TU). It is NOT
+            // concordance – concordance lives on SearchText. Prior builds
+            // (v4.20.26 – v4.20.31) wrongly routed this through FTS5
+            // SearchConcordance and scored every substring hit as 100%,
+            // causing wildly wrong "100% matches" to be inserted and
+            // auto-confirmed in the editor. Now: extract the TU's source
+            // segment, do byte-exact source-text lookup, and return only
+            // true 100% matches – same semantics as SearchSegment.
             var results = NewSearchResults(translationUnit?.SourceSegment);
             if (_tmInfo == null || translationUnit == null) return results;
 
-            string query = null;
-            bool searchTarget = false;
-            if (translationUnit.TargetSegment != null && !translationUnit.TargetSegment.IsEmpty)
+            if (translationUnit.SourceSegment == null || translationUnit.SourceSegment.IsEmpty)
+                return results;
+
+            string queryText;
+            try
             {
-                query = translationUnit.TargetSegment.ToPlain();
-                searchTarget = true;
+                queryText = translationUnit.SourceSegment.ToPlain() ?? string.Empty;
             }
-            else if (translationUnit.SourceSegment != null && !translationUnit.SourceSegment.IsEmpty)
+            catch (Exception ex)
             {
-                query = translationUnit.SourceSegment.ToPlain();
-                searchTarget = false;
+                TmBridgeLog.Error("SearchTranslationUnit: source.ToPlain() threw", ex);
+                return results;
             }
-            if (string.IsNullOrEmpty(query)) return results;
+            if (string.IsNullOrEmpty(queryText)) return results;
 
             try
             {
@@ -310,8 +316,8 @@ namespace Supervertaler.Trados.TranslationProviders
                         TmBridgeLog.Warn("SearchTranslationUnit: TmReader.Open() failed: " + (reader.LastError ?? "(no message)"));
                         return results;
                     }
-                    var matches = reader.SearchConcordance(
-                        _tmInfo.TmId, query, searchTarget, MaxConcordanceResults);
+                    var matches = reader.SearchExact(_tmInfo.TmId, queryText, MaxExactResults);
+                    SafeLog("SearchTranslationUnit: TM=" + _tmInfo.TmId + " query='" + Truncate(queryText, 60) + "' returned " + matches.Count + " exact matches");
                     foreach (var m in matches)
                     {
                         var sr = TryBuildSearchResult(m);
@@ -321,7 +327,7 @@ namespace Supervertaler.Trados.TranslationProviders
             }
             catch (Exception ex)
             {
-                TmBridgeLog.Error("SearchTranslationUnit: failed for query '" + Truncate(query, 80) + "'", ex);
+                TmBridgeLog.Error("SearchTranslationUnit: failed for query '" + Truncate(queryText, 80) + "'", ex);
             }
 
             return results;

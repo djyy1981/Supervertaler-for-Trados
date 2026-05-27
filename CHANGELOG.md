@@ -1,5 +1,18 @@
 # Changelog
 
+## [4.20.32] – 2026-05-27
+
+### Fixed (Shared TM Bridge: critical – wrong "100%" matches no longer inserted)
+
+- **`SearchTranslationUnit` now does true exact-source lookup instead of concordance.** This is a serious correctness fix. Trados Studio's per-segment matching in the editor and in batch tasks routes through `SearchTranslationUnitsMasked → SearchTranslationUnit`, NOT `SearchSegment` (which the SDK docs imply but Studio doesn't actually call in document context). Prior builds (v4.20.26 – v4.20.31) wrongly implemented `SearchTranslationUnit` as an FTS5 concordance search, then scored every substring hit as 100%. The practical effect: a segment with source "GEDETAILLEERDE BESCHRIJVING" would FTS5-match any TM row whose source or target contained "gedetailleerde" OR "beschrijving" – including a totally different row like "De gedetailleerde beschrijving beschrijft huidige uitvinding in zijn voorkeurdragende uitvoeringsvormen" / "The detailed description describes the preferred embodiments of the present invention" – and Studio would insert and auto-confirm that wrong translation at 100%.
+- **Now**: `SearchTranslationUnit` extracts the TU's source segment, runs the same byte-exact `WHERE source_text = $src` lookup as `SearchSegment`, and returns only true 100% matches. Concordance lives where it always should: `SearchText`.
+- **Query/result diagnostic logging.** Both `SearchSegment` and `SearchTranslationUnit` now log the query text plus the exact-match count to `%TEMP%\supervertaler-tm-bridge.log`. This made the previous build's bad behaviour easy to diagnose ("`SearchTranslationUnitsMasked` is hot, `SearchSegment` is cold") and gives quick feedback that the fix is producing the right exact-match counts going forward.
+
+### Action for users on prior builds
+
+- **Inspect any segments confirmed against bridged TMs in v4.20.26 – v4.20.31** – their targets may be totally unrelated text drawn from a same-token concordance hit. Filter by "Translated" + "Confirmed by Supervertaler TM" and re-review. The 100% match icon was not trustworthy in those builds.
+
+
 ## [4.20.31] – 2026-05-27
 
 ### Fixed (Shared TM Bridge: ACTUAL root cause of the "Object reference" NRE)
