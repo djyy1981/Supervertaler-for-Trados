@@ -196,6 +196,7 @@ namespace Supervertaler.Trados.TranslationProviders
 
         public SearchResults[] SearchSegments(SearchSettings settings, Segment[] segments)
         {
+            TmBridgeLog.Info("LanguageDirection.SearchSegments ENTRY (n=" + (segments == null ? 0 : segments.Length) + ")");
             if (segments == null) return new SearchResults[0];
             var output = new SearchResults[segments.Length];
             for (int i = 0; i < segments.Length; i++)
@@ -205,6 +206,7 @@ namespace Supervertaler.Trados.TranslationProviders
 
         public SearchResults[] SearchSegmentsMasked(SearchSettings settings, Segment[] segments, bool[] mask)
         {
+            TmBridgeLog.Info("LanguageDirection.SearchSegmentsMasked ENTRY (n=" + (segments == null ? 0 : segments.Length) + ", mask=" + (mask == null ? "(null)" : mask.Length.ToString()) + ")");
             if (segments == null) return new SearchResults[0];
             var output = new SearchResults[segments.Length];
             for (int i = 0; i < segments.Length; i++)
@@ -349,25 +351,46 @@ namespace Supervertaler.Trados.TranslationProviders
         // up to the user as a generic "provider error". Returning a safe
         // empty result instead is the documented well-behaved pattern.
         public ImportResult AddTranslationUnit(TranslationUnit translationUnit, ImportSettings settings)
-            => SafeNotSupportedResult();
+        {
+            TmBridgeLog.Info("LanguageDirection.AddTranslationUnit ENTRY");
+            return SafeNotSupportedResult();
+        }
 
         public ImportResult[] AddTranslationUnits(TranslationUnit[] translationUnits, ImportSettings settings)
-            => SafeNotSupportedResults(translationUnits);
+        {
+            TmBridgeLog.Info("LanguageDirection.AddTranslationUnits ENTRY (n=" + (translationUnits == null ? 0 : translationUnits.Length) + ")");
+            return SafeNotSupportedResults(translationUnits);
+        }
 
         public ImportResult[] AddOrUpdateTranslationUnits(TranslationUnit[] translationUnits, int[] previousTranslationHashes, ImportSettings settings)
-            => SafeNotSupportedResults(translationUnits);
+        {
+            TmBridgeLog.Info("LanguageDirection.AddOrUpdateTranslationUnits ENTRY (n=" + (translationUnits == null ? 0 : translationUnits.Length) + ")");
+            return SafeNotSupportedResults(translationUnits);
+        }
 
         public ImportResult[] AddTranslationUnitsMasked(TranslationUnit[] translationUnits, ImportSettings settings, bool[] mask)
-            => SafeNotSupportedResults(translationUnits);
+        {
+            TmBridgeLog.Info("LanguageDirection.AddTranslationUnitsMasked ENTRY (n=" + (translationUnits == null ? 0 : translationUnits.Length) + ")");
+            return SafeNotSupportedResults(translationUnits);
+        }
 
         public ImportResult[] AddOrUpdateTranslationUnitsMasked(TranslationUnit[] translationUnits, int[] previousTranslationHashes, ImportSettings settings, bool[] mask)
-            => SafeNotSupportedResults(translationUnits);
+        {
+            TmBridgeLog.Info("LanguageDirection.AddOrUpdateTranslationUnitsMasked ENTRY (n=" + (translationUnits == null ? 0 : translationUnits.Length) + ")");
+            return SafeNotSupportedResults(translationUnits);
+        }
 
         public ImportResult UpdateTranslationUnit(TranslationUnit translationUnit)
-            => SafeNotSupportedResult();
+        {
+            TmBridgeLog.Info("LanguageDirection.UpdateTranslationUnit ENTRY");
+            return SafeNotSupportedResult();
+        }
 
         public ImportResult[] UpdateTranslationUnits(TranslationUnit[] translationUnits)
-            => SafeNotSupportedResults(translationUnits);
+        {
+            TmBridgeLog.Info("LanguageDirection.UpdateTranslationUnits ENTRY (n=" + (translationUnits == null ? 0 : translationUnits.Length) + ")");
+            return SafeNotSupportedResults(translationUnits);
+        }
 
         private static ImportResult SafeNotSupportedResult()
         {

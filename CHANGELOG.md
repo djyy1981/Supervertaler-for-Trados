@@ -1,5 +1,13 @@
 # Changelog
 
+## [4.20.30] – 2026-05-27
+
+### Changed (Shared TM Bridge: diagnostic build – reverts v4.20.29's wrong fix)
+
+- **`SupportsTranslation` reverted to `true`.** v4.20.29's hypothesis that this flag meant "MT-style provider" was wrong. The %TEMP%\supervertaler-tm-bridge.log from v4.20.29 made the actual semantics clear: per-segment, Trados queries `LanguageDirection.TranslationProvider` → `Provider.TranslationMethod` → `Provider.SupportsSearchForTranslationUnits` → `Provider.SupportsTranslation` and only proceeds to call `SearchSegment` when that last flag is `true`. Setting it to `false` produced "The translation provider X does not support translation." warnings and zero lookups.
+- **Entry logging on every method of the LanguageDirection** – all write methods (`AddTranslationUnit`, `AddTranslationUnits`, `AddOrUpdateTranslationUnits`, `AddTranslationUnitsMasked`, `AddOrUpdateTranslationUnitsMasked`, `UpdateTranslationUnit`, `UpdateTranslationUnits`) and the remaining search variants (`SearchSegments`, `SearchSegmentsMasked`) now log on entry. With `SupportsTranslation = true` back in place, the next failing build will show in the log exactly which method Studio calls between the capability poll and the (still missing) `SearchSegment ENTRY`. That's almost certainly where the residual "Object reference" NRE originates – Studio is probably calling a method we haven't routed cleanly.
+
+
 ## [4.20.29] – 2026-05-27
 
 ### Fixed (Shared TM Bridge: root cause of the "Object reference" NRE)

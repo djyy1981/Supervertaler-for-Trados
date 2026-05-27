@@ -161,14 +161,17 @@ namespace Supervertaler.Trados.TranslationProviders
         // Conservative set for v1 – everything not implemented yet is OFF
         // so Studio doesn't surface UI promising features that aren't there.
         //
-        // v4.20.29: SupportsTranslation is now FALSE. SDK convention: a
-        // `true` value advertises this as an *automated translation*
-        // (MT-style) provider, prompting Studio to invoke a translation-
-        // engine code path that doesn't exist for a TM lookup provider.
-        // That mismatch was producing the "Object reference not set to an
-        // instance of an object" failures observed in v4.20.28 – Studio
-        // would call SupportsLanguageDirection / GetLanguageDirection in
-        // a tight loop without ever reaching SearchSegment.
+        // SupportsTranslation MUST be true – v4.20.29 mistakenly flipped it
+        // to false, and Trados then emitted "The translation provider X
+        // does not support translation." warnings and refused to invoke
+        // any search. The %TEMP%\supervertaler-tm-bridge.log from that
+        // build confirmed the call pattern:
+        //   LanguageDirection.TranslationProvider →
+        //   Provider.TranslationMethod (=TranslationMemory) →
+        //   Provider.SupportsSearchForTranslationUnits (=true) →
+        //   Provider.SupportsTranslation (=false → STOP, skip search)
+        // So this flag is the gate Trados checks per-segment to decide
+        // whether to call SearchSegment at all.
         //
         // Every getter is also instrumented so future regressions can be
         // diagnosed from %TEMP%\supervertaler-tm-bridge.log alone.
@@ -183,7 +186,7 @@ namespace Supervertaler.Trados.TranslationProviders
         public bool SupportsDocumentSearches { get { TmBridgeLog.Info("Provider.SupportsDocumentSearches => false"); return false; } }
         public bool SupportsUpdate { get { TmBridgeLog.Info("Provider.SupportsUpdate => false"); return false; } }
         public bool SupportsPlaceables { get { TmBridgeLog.Info("Provider.SupportsPlaceables => false"); return false; } }
-        public bool SupportsTranslation { get { TmBridgeLog.Info("Provider.SupportsTranslation => false"); return false; } }
+        public bool SupportsTranslation { get { TmBridgeLog.Info("Provider.SupportsTranslation => true"); return true; } }
         public bool SupportsFuzzySearch { get { TmBridgeLog.Info("Provider.SupportsFuzzySearch => false"); return false; } }
         public bool SupportsConcordanceSearch { get { TmBridgeLog.Info("Provider.SupportsConcordanceSearch => true"); return true; } }
         public bool SupportsSourceConcordanceSearch { get { TmBridgeLog.Info("Provider.SupportsSourceConcordanceSearch => true"); return true; } }
