@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using Sdl.Core.Globalization;
 using Sdl.LanguagePlatform.Core;
 using Sdl.LanguagePlatform.TranslationMemory;
 using Sdl.LanguagePlatform.TranslationMemoryApi;
@@ -67,36 +68,69 @@ namespace Supervertaler.Trados.TranslationProviders
 
         public SearchResults SearchSegment(SearchSettings settings, Segment segment)
         {
-            var results = new SearchResults { SourceSegment = segment.Duplicate() };
-            if (_tmInfo == null) return results;
+            // Defensive: Studio occasionally passes null segments in
+            // exploratory pre-flight calls. Returning an empty SearchResults
+            // is the documented correct behaviour – throwing here causes
+            // Trados to surface "An error has occurred while using the
+            // translation provider" and disable the provider for the
+            // session.
+            var results = new SearchResults();
+            try
+            {
+                if (segment != null)
+                    results.SourceSegment = segment.Duplicate();
+            }
+            catch (Exception ex)
+            {
+                TmBridgeLog.Error("SearchSegment: failed to Duplicate source segment", ex);
+            }
 
-            var queryText = segment != null ? segment.ToPlain() : null;
+            if (_tmInfo == null)
+            {
+                TmBridgeLog.Warn("SearchSegment called on provider with no TmInfo (TM no longer bridged?)");
+                return results;
+            }
+            if (segment == null)
+            {
+                TmBridgeLog.Warn("SearchSegment called with null segment");
+                return results;
+            }
+
+            string queryText;
+            try
+            {
+                queryText = segment.ToPlain() ?? string.Empty;
+            }
+            catch (Exception ex)
+            {
+                TmBridgeLog.Error("SearchSegment: segment.ToPlain() threw", ex);
+                return results;
+            }
             if (string.IsNullOrEmpty(queryText)) return results;
 
             try
             {
                 using (var reader = new TmReader(_dbPath))
                 {
-                    if (!reader.Open()) return results;
+                    if (!reader.Open())
+                    {
+                        TmBridgeLog.Warn("SearchSegment: TmReader.Open() failed: " + (reader.LastError ?? "(no message)"));
+                        return results;
+                    }
 
                     var matches = reader.SearchExact(_tmInfo.TmId, queryText, MaxExactResults);
                     foreach (var m in matches)
                     {
-                        var tu = BuildTranslationUnit(m);
-                        var sr = new SearchResult(tu)
-                        {
-                            ScoringResult = new ScoringResult { Match = 100, BaseScore = 100 },
-                        };
-                        results.Add(sr);
+                        var sr = TryBuildSearchResult(m);
+                        if (sr != null) results.Add(sr);
                     }
                 }
             }
-            catch
+            catch (Exception ex)
             {
-                // Search must never throw – Studio's TM pane treats a thrown
-                // exception as a hard provider failure and stops calling the
-                // provider for the rest of the session. Return whatever we
-                // collected (possibly empty) instead.
+                TmBridgeLog.Error(
+                    "SearchSegment: lookup against TM '" + _tmInfo.TmId +
+                    "' failed for query '" + Truncate(queryText, 80) + "'", ex);
             }
 
             return results;
@@ -151,21 +185,24 @@ namespace Supervertaler.Trados.TranslationProviders
             {
                 using (var reader = new TmReader(_dbPath))
                 {
-                    if (!reader.Open()) return results;
+                    if (!reader.Open())
+                    {
+                        TmBridgeLog.Warn("SearchText: TmReader.Open() failed: " + (reader.LastError ?? "(no message)"));
+                        return results;
+                    }
                     var matches = reader.SearchConcordance(
                         _tmInfo.TmId, segment, searchTarget: false, MaxConcordanceResults);
                     foreach (var m in matches)
                     {
-                        var tu = BuildTranslationUnit(m);
-                        var sr = new SearchResult(tu)
-                        {
-                            ScoringResult = new ScoringResult { Match = 100, BaseScore = 100 },
-                        };
-                        results.Add(sr);
+                        var sr = TryBuildSearchResult(m);
+                        if (sr != null) results.Add(sr);
                     }
                 }
             }
-            catch { /* swallow – see SearchSegment */ }
+            catch (Exception ex)
+            {
+                TmBridgeLog.Error("SearchText: failed for query '" + Truncate(segment, 80) + "'", ex);
+            }
 
             return results;
         }
@@ -197,21 +234,24 @@ namespace Supervertaler.Trados.TranslationProviders
             {
                 using (var reader = new TmReader(_dbPath))
                 {
-                    if (!reader.Open()) return results;
+                    if (!reader.Open())
+                    {
+                        TmBridgeLog.Warn("SearchTranslationUnit: TmReader.Open() failed: " + (reader.LastError ?? "(no message)"));
+                        return results;
+                    }
                     var matches = reader.SearchConcordance(
                         _tmInfo.TmId, query, searchTarget, MaxConcordanceResults);
                     foreach (var m in matches)
                     {
-                        var tu = BuildTranslationUnit(m);
-                        var sr = new SearchResult(tu)
-                        {
-                            ScoringResult = new ScoringResult { Match = 100, BaseScore = 100 },
-                        };
-                        results.Add(sr);
+                        var sr = TryBuildSearchResult(m);
+                        if (sr != null) results.Add(sr);
                     }
                 }
             }
-            catch { /* swallow */ }
+            catch (Exception ex)
+            {
+                TmBridgeLog.Error("SearchTranslationUnit: failed for query '" + Truncate(query, 80) + "'", ex);
+            }
 
             return results;
         }
@@ -243,28 +283,86 @@ namespace Supervertaler.Trados.TranslationProviders
 
         // ─── Write API (Phase 3 – currently all throw) ────────────────
 
+        // v4.20.27: write methods used to throw NotSupportedException to
+        // make any consumer that ignored IsReadOnly = true fail loudly,
+        // but Trados Studio's batch-tasks pipeline (notably "Update Main
+        // Translation Memories") calls these speculatively even when
+        // IsReadOnly is reported true – and the thrown exception bubbles
+        // up to the user as a generic "provider error". Returning a safe
+        // empty result instead is the documented well-behaved pattern.
         public ImportResult AddTranslationUnit(TranslationUnit translationUnit, ImportSettings settings)
-            => throw new NotSupportedException("Supervertaler TM bridge is read-only in v1 (Phase 2). Write-back lands in Phase 3.");
+            => SafeNotSupportedResult();
 
         public ImportResult[] AddTranslationUnits(TranslationUnit[] translationUnits, ImportSettings settings)
-            => throw new NotSupportedException("Supervertaler TM bridge is read-only in v1 (Phase 2). Write-back lands in Phase 3.");
+            => SafeNotSupportedResults(translationUnits);
 
         public ImportResult[] AddOrUpdateTranslationUnits(TranslationUnit[] translationUnits, int[] previousTranslationHashes, ImportSettings settings)
-            => throw new NotSupportedException("Supervertaler TM bridge is read-only in v1 (Phase 2). Write-back lands in Phase 3.");
+            => SafeNotSupportedResults(translationUnits);
 
         public ImportResult[] AddTranslationUnitsMasked(TranslationUnit[] translationUnits, ImportSettings settings, bool[] mask)
-            => throw new NotSupportedException("Supervertaler TM bridge is read-only in v1 (Phase 2). Write-back lands in Phase 3.");
+            => SafeNotSupportedResults(translationUnits);
 
         public ImportResult[] AddOrUpdateTranslationUnitsMasked(TranslationUnit[] translationUnits, int[] previousTranslationHashes, ImportSettings settings, bool[] mask)
-            => throw new NotSupportedException("Supervertaler TM bridge is read-only in v1 (Phase 2). Write-back lands in Phase 3.");
+            => SafeNotSupportedResults(translationUnits);
 
         public ImportResult UpdateTranslationUnit(TranslationUnit translationUnit)
-            => throw new NotSupportedException("Supervertaler TM bridge is read-only in v1 (Phase 2). Write-back lands in Phase 3.");
+            => SafeNotSupportedResult();
 
         public ImportResult[] UpdateTranslationUnits(TranslationUnit[] translationUnits)
-            => throw new NotSupportedException("Supervertaler TM bridge is read-only in v1 (Phase 2). Write-back lands in Phase 3.");
+            => SafeNotSupportedResults(translationUnits);
+
+        private static ImportResult SafeNotSupportedResult()
+        {
+            // ImportResult has no explicit "not supported" status; an empty
+            // (default-constructed) one signals "no rows applied" without
+            // throwing. Trados treats it as a no-op.
+            return new ImportResult();
+        }
+
+        private static ImportResult[] SafeNotSupportedResults(TranslationUnit[] tus)
+        {
+            var len = tus != null ? tus.Length : 0;
+            var arr = new ImportResult[len];
+            for (int i = 0; i < len; i++) arr[i] = new ImportResult();
+            return arr;
+        }
 
         // ─── Helpers ──────────────────────────────────────────────────
+
+        /// <summary>
+        /// Wraps <see cref="BuildTranslationUnit"/> + <see cref="SearchResult"/>
+        /// construction in a try/catch that logs the failure and returns null.
+        /// Callers add to the SearchResults list only when this returns non-null,
+        /// so one bad row never poisons a whole result batch.
+        /// </summary>
+        private Sdl.LanguagePlatform.TranslationMemory.SearchResult TryBuildSearchResult(BridgedTu m)
+        {
+            try
+            {
+                var tu = BuildTranslationUnit(m);
+                if (tu == null) return null;
+                // Fully-qualify SearchResult: Supervertaler.Trados.Core has
+                // its own SearchResult that would otherwise win the
+                // unqualified-name lookup. Match is read-only on
+                // ScoringResult – computed from BaseScore minus penalties,
+                // so setting BaseScore = 100 with no penalties yields 100%.
+                return new Sdl.LanguagePlatform.TranslationMemory.SearchResult(tu)
+                {
+                    ScoringResult = new ScoringResult { BaseScore = 100 },
+                };
+            }
+            catch (Exception ex)
+            {
+                TmBridgeLog.Error("TryBuildSearchResult: failed for TU id=" + m.Id, ex);
+                return null;
+            }
+        }
+
+        private static string Truncate(string s, int max)
+        {
+            if (string.IsNullOrEmpty(s)) return string.Empty;
+            return s.Length <= max ? s : s.Substring(0, max) + "...";
+        }
 
         /// <summary>
         /// Builds a Trados <see cref="TranslationUnit"/> from a raw row
@@ -274,8 +372,19 @@ namespace Supervertaler.Trados.TranslationProviders
         /// custom field values, no contexts – those live on Trados-native
         /// TMs and aren't represented in Workbench's schema.
         /// </summary>
-        private TranslationUnit BuildTranslationUnit(TmMatch m)
+        private TranslationUnit BuildTranslationUnit(BridgedTu m)
         {
+            // CultureCode is a value type – it's not nullable, but it CAN
+            // be the default/empty value. Trados accepts that; the Segment
+            // ctor just stores it. We log if we hit an empty culture so we
+            // know our SupportsLanguageDirection plumbing is off.
+            if (SourceLanguage.Name == null || TargetLanguage.Name == null)
+            {
+                TmBridgeLog.Warn(
+                    "BuildTranslationUnit: empty culture on language pair " +
+                    "(src=" + SourceLanguage.Name + ", tgt=" + TargetLanguage.Name + ")");
+            }
+
             var src = new Segment(SourceLanguage);
             src.Add(m.SourceText ?? string.Empty);
 

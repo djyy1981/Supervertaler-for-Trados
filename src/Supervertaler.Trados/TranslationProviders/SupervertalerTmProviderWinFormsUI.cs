@@ -194,7 +194,10 @@ namespace Supervertaler.Trados.TranslationProviders
                 Name = name,
                 TooltipText = tooltip,
                 SearchResultImage = null,
-                TranslationProviderIcon = null,
+                // Trados shows this icon in the project's "Translation Memory
+                // and Automated Translation" list next to each attached
+                // provider. Same blue Sv icon every other dialog uses.
+                TranslationProviderIcon = IconHelper.AppIcon,
             };
         }
 
@@ -231,6 +234,7 @@ namespace Supervertaler.Trados.TranslationProviders
             SelectedTms = new List<TmInfo>();
 
             Text = "Add Supervertaler TM";
+            Icon = IconHelper.AppIcon;
             Size = new Size(560, 420);
             MinimumSize = new Size(420, 280);
             FormBorderStyle = FormBorderStyle.Sizable;

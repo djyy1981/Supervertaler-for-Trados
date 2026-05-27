@@ -207,9 +207,9 @@ namespace Supervertaler.Trados.Core
         /// <c>source_text</c> column. Hash-first lookup keeps this O(1) at any
         /// TM size; the hash column is indexed in Workbench's schema.
         /// </summary>
-        public List<TmMatch> SearchExact(string tmId, string sourceText, int maxResults = 5)
+        public List<BridgedTu> SearchExact(string tmId, string sourceText, int maxResults = 5)
         {
-            var result = new List<TmMatch>();
+            var result = new List<BridgedTu>();
             if (_connection == null || string.IsNullOrEmpty(tmId) || sourceText == null)
                 return result;
 
@@ -235,7 +235,7 @@ namespace Supervertaler.Trados.Core
                     {
                         while (reader.Read())
                         {
-                            result.Add(ReadTmMatch(reader, score: 100));
+                            result.Add(ReadBridgedTu(reader, score: 100));
                         }
                     }
                 }
@@ -258,13 +258,13 @@ namespace Supervertaler.Trados.Core
         /// Searches either column based on <paramref name="searchTarget"/>:
         /// false = source-side, true = target-side.
         /// </summary>
-        public List<TmMatch> SearchConcordance(
+        public List<BridgedTu> SearchConcordance(
             string tmId,
             string query,
             bool searchTarget,
             int maxResults = 25)
         {
-            var result = new List<TmMatch>();
+            var result = new List<BridgedTu>();
             if (_connection == null || string.IsNullOrEmpty(tmId) || string.IsNullOrEmpty(query))
                 return result;
 
@@ -298,7 +298,7 @@ namespace Supervertaler.Trados.Core
                     {
                         while (reader.Read())
                         {
-                            result.Add(ReadTmMatch(reader, score: 100));
+                            result.Add(ReadBridgedTu(reader, score: 100));
                         }
                     }
                 }
@@ -326,9 +326,9 @@ namespace Supervertaler.Trados.Core
 
         // ─── Helpers ──────────────────────────────────────────────────
 
-        private static TmMatch ReadTmMatch(SqliteDataReader reader, int score)
+        private static BridgedTu ReadBridgedTu(SqliteDataReader reader, int score)
         {
-            return new TmMatch
+            return new BridgedTu
             {
                 Id = reader.GetInt64(0),
                 SourceText = reader.IsDBNull(1) ? string.Empty : reader.GetString(1),
@@ -392,7 +392,7 @@ namespace Supervertaler.Trados.Core
     /// match (100 for exact and concordance hits in v1; fuzzy matching in
     /// Phase 3 will populate this with proper Levenshtein-derived scores).
     /// </summary>
-    public class TmMatch
+    public class BridgedTu
     {
         public long Id;
         public string SourceText;

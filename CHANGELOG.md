@@ -1,5 +1,22 @@
 # Changelog
 
+## [4.20.27] – 2026-05-27
+
+### Fixed (Shared TM Bridge: defensive null-handling + diagnostics for "Object reference" errors)
+
+- **First testing of the v4.20.26 SupervertalerTmProvider against a real Trados Studio session surfaced "An error has occurred while using the translation provider Supervertaler TM: <name>: Object reference not set to an instance of an object." errors on every lookup,** with no usable stack trace in Studio's Messages panel. This release adds the infrastructure to diagnose and prevent that class of failure.
+- **New `TmBridgeLog`** (file logger at `%TEMP%\supervertaler-tm-bridge.log`). All provider-side error paths now log with full stack traces before swallowing the exception. Append-only with size-capped rotation.
+- **Defensive null-handling in `SearchSegment`**: previously dereferenced `segment.Duplicate()` before null-checking, which would throw NRE on Studio's pre-flight calls. Now null-safe at every level; falls through to an empty `SearchResults` on any failure instead of throwing.
+- **`SearchText` and `SearchTranslationUnit`** get the same treatment – defensive null handling, instrumented with `TmBridgeLog` so failures are diagnosable.
+- **New `TryBuildSearchResult` helper** wraps the per-row `TranslationUnit` construction in try/catch. One bad row in the result set no longer poisons the rest of the batch; it's logged and skipped.
+- **Write methods (`AddTranslationUnit`, `UpdateTranslationUnit`, etc.) no longer throw `NotSupportedException`.** Although `IsReadOnly = true` and `SupportsUpdate = false` should keep Trados from ever calling these, batch-tasks pipelines (notably "Update Main Translation Memories") have been observed to call them speculatively, and the thrown exception bubbles up as a generic provider error. They now return a safe empty `ImportResult` (no-op).
+
+### Changed
+
+- **Sv icon on the "Add Supervertaler TM" picker dialogue** + on the project's translation-provider list (via `TranslationProviderDisplayInfo.TranslationProviderIcon`). Picks up the same shared icon every other plugin dialogue already uses.
+- **Culture-pair empty-state logging.** If `BuildTranslationUnit` is ever called with an empty source/target culture, a warning lands in the log – this lets us catch language-pair-filtering bugs without silent fallout.
+
+
 ## [4.20.26] – 2026-05-27
 
 ### Added (Shared TM Phase 2: read-only access to Supervertaler Workbench TMs)
