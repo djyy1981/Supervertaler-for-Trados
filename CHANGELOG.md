@@ -1,5 +1,32 @@
 # Changelog
 
+## [4.20.26] – 2026-05-27
+
+### Added (Shared TM Phase 2: read-only access to Supervertaler Workbench TMs)
+
+- **New translation-provider plugin: "Supervertaler TM Bridge".** Trados can now attach individual TMs that live in Supervertaler Workbench's shared SQLite database (`supervertaler.db`) directly, without any TMX export / import dance. Phase 2 of the Shared TM work tracked in #31, building on the Workbench-side opt-in flag shipped in Workbench v1.10.212.
+- **Discovery via Trados' standard "Add → Translation provider" menu.** A new "Supervertaler TM" entry shows up alongside the standard SDLTM, GroupShare, etc. options. Clicking it opens a picker dialogue listing every TM the user has flagged "Bridge" in Workbench's TMs tab, filtered to those matching the current project's language pair (loose match: bare `nl` matches `nl-NL`, etc.). Tick one or more to attach.
+- **Live data.** Both products read and write the same `supervertaler.db`. Adding a new entry to a bridged TM via Workbench's editor surfaces in Trados on the next lookup, no sync step. Conversely, Trados's read flows through to anything Workbench shows.
+- **Exact match (100%) and concordance search supported.** Studio's TM-results pane shows exact hits with the standard 100% chip; the Concordance window searches source-side AND target-side via the FTS5 index Workbench already maintains.
+
+### Phased scope (this is the read-only half)
+
+- **Read-only in v1.** `SupportsUpdate = false`, `IsReadOnly = true`. Add/Update/Delete methods throw `NotSupportedException` defensively – any consumer ignoring the read-only flag fails loudly rather than silently dropping data. Write-back lands in Phase 3.
+- **No fuzzy matching yet.** `SupportsFuzzySearch = false`. The provider returns *only* 100% matches; sub-100 fuzzy comes in Phase 3 once a Levenshtein-on-candidates scorer is in place. For now, fuzzy lookups fall through to any other providers attached to the project (e.g. the user's main SDLTM).
+
+### Implementation notes
+
+- New `Core/TmReader.cs` mirrors the existing `TermbaseReader.cs` shape (read-only SQLite via `Microsoft.Data.Sqlite`, no native-DLL interop). It only reads TMs where `bridged_to_trados = 1`, so freelancers with multiple-client TM libraries don't see cross-client leakage in a Trados session opened on a specific project.
+- New `TranslationProviders/SupervertalerTmProvider.cs` + `SupervertalerTmLanguageDirection.cs` + `SupervertalerTmProviderFactory.cs` + `SupervertalerTmProviderWinFormsUI.cs` implement the Trados-side surface area. URI scheme is `supervertaler-tm:///<tm_id>` (using the stable string id Workbench stores in `translation_units.tm_id`).
+- plugin.xml gains two `<extension>` entries – one for the factory, one for the WinForms UI – using the `TranslationProviderFactoryAttribute` / `TranslationProviderWinFormsUiAttribute` types from `Sdl.LanguagePlatform.TranslationMemoryApi`.
+
+### What translators see
+
+- **Workbench**: tick the orange "Bridge" checkbox next to a TM in the TMs tab. That's it.
+- **Trados**: Project settings → Translation Memory and Automated Translation → Use → Add → Supervertaler TM. Pick the TM(s) from the dropdown.
+- **The TM behaves like any other Trados TM** after that – exact matches and concordance hits show up in the standard panes, attribution shows "Supervertaler" as the origin system.
+
+
 ## [4.20.25] – 2026-05-26
 
 ### Changed
