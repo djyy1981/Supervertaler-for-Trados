@@ -1,5 +1,12 @@
 # Changelog
 
+## [4.20.42] – 2026-06-02
+
+### Fixed (Shared TM bridge — per-row direction)
+
+- **Bridged TMs now return matches even when the TM mixes both directions.** v4.20.41 made a bridged TM attach to a project regardless of its declared direction, but it then assumed the *whole* TM was stored in one direction and searched only one column — so segments saved into the TM in the *opposite* direction to its declared one were silently missed. (Real case: an nl→en TM into which en→nl segments had been saved from an en→nl project — the lookup searched the English-target column and never found the rows whose English sat in the *source* column.) A Supervertaler TM's direction is a **per-row** property, so the bridge now (1) searches **both** the source and target columns for exact and concordance lookups, and (2) orients **each returned row individually** by its own `source_lang`/`target_lang` (on the base language, en≡en-US, nl≡nl-BE), falling back to the TM-level direction only when a row's languages are missing. Studio still always sees correct project-source → project-target hits.
+
+
 ## [4.20.41] – 2026-06-02
 
 ### Fixed (Shared TM bridge)

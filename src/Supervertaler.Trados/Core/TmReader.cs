@@ -203,25 +203,23 @@ namespace Supervertaler.Trados.Core
 
         /// <summary>
         /// Returns up to <paramref name="maxResults"/> exact matches in
-        /// <paramref name="tmId"/>. "Exact" = byte-for-byte equality on the
-        /// query column.
+        /// <paramref name="tmId"/>. "Exact" = byte-for-byte equality of the
+        /// query against EITHER the <c>source_text</c> or the <c>target_text</c>
+        /// column.
         ///
-        /// <paramref name="searchTarget"/> selects which column the query text
-        /// is matched against: false = <c>source_text</c> (normal, TM stored in
-        /// the project's direction), true = <c>target_text</c> (the TM is
-        /// stored in the REVERSE direction relative to the project, e.g. an
-        /// nl→en TM attached to an en→nl project — we match the project's
-        /// source text against the TM's English target column). The caller
-        /// (<see cref="SupervertalerTmLanguageDirection"/>) swaps source/target
-        /// on the way out so Studio still sees project-source → project-target.
+        /// Both columns are searched because a Supervertaler TM can hold rows
+        /// in BOTH directions (e.g. a TM declared nl→en that also has en→nl
+        /// rows saved from an en→nl project). Direction is a per-row property,
+        /// not a per-TM one, so we can't pick a single column up front. The
+        /// caller (<see cref="SupervertalerTmLanguageDirection"/>) orients each
+        /// returned row by its own <c>source_lang</c>/<c>target_lang</c> so
+        /// Studio always sees project-source → project-target.
         /// </summary>
-        public List<BridgedTu> SearchExact(string tmId, string sourceText, int maxResults = 5, bool searchTarget = false)
+        public List<BridgedTu> SearchExact(string tmId, string sourceText, int maxResults = 5)
         {
             var result = new List<BridgedTu>();
             if (_connection == null || string.IsNullOrEmpty(tmId) || sourceText == null)
                 return result;
-
-            var queryColumn = searchTarget ? "target_text" : "source_text";
 
             try
             {
@@ -234,7 +232,7 @@ namespace Supervertaler.Trados.Core
                                usage_count, created_by
                         FROM translation_units
                         WHERE tm_id = $tm_id
-                          AND " + queryColumn + @" = $src
+                          AND (source_text = $src OR target_text = $src)
                         ORDER BY modified_date DESC
                         LIMIT $limit";
                     cmd.Parameters.AddWithValue("$tm_id", tmId);
@@ -265,13 +263,14 @@ namespace Supervertaler.Trados.Core
         /// concordance is a substring/keyword search and doesn't have a
         /// "fuzziness percentage" the way segment-level fuzzy matching does.
         ///
-        /// Searches either column based on <paramref name="searchTarget"/>:
-        /// false = source-side, true = target-side.
+        /// Searches BOTH the source_text and target_text columns (the FTS
+        /// index covers exactly those two), so concordance hits are found
+        /// regardless of which direction each row was stored in. The caller
+        /// orients each row by its own languages.
         /// </summary>
         public List<BridgedTu> SearchConcordance(
             string tmId,
             string query,
-            bool searchTarget,
             int maxResults = 25)
         {
             var result = new List<BridgedTu>();
@@ -280,8 +279,9 @@ namespace Supervertaler.Trados.Core
 
             // FTS5 syntax: wrap in double quotes to treat as a phrase; escape
             // any embedded quotes by doubling them per FTS5 string-literal rules.
+            // A column-less MATCH searches every indexed column (source_text +
+            // target_text), so a row matches whichever side the text lives in.
             var ftsQuery = "\"" + query.Replace("\"", "\"\"") + "\"";
-            var column = searchTarget ? "target_text" : "source_text";
 
             try
             {
@@ -296,7 +296,7 @@ namespace Supervertaler.Trados.Core
                         WHERE tu.tm_id = $tm_id
                           AND tu.id IN (
                               SELECT rowid FROM translation_units_fts
-                              WHERE " + column + @" MATCH $q
+                              WHERE translation_units_fts MATCH $q
                               LIMIT $limit
                           )
                         ORDER BY tu.modified_date DESC";

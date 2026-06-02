@@ -207,8 +207,8 @@ namespace Supervertaler.Trados.TranslationProviders
                         return results;
                     }
 
-                    var matches = reader.SearchExact(_tmInfo.TmId, queryText, MaxExactResults, searchTarget: _reversed);
-                    SafeLog("SearchSegment: TM=" + _tmInfo.TmId + (_reversed ? " [reversed]" : "") + " query='" + Truncate(queryText, 60) + "' returned " + matches.Count + " exact matches");
+                    var matches = reader.SearchExact(_tmInfo.TmId, queryText, MaxExactResults);
+                    SafeLog("SearchSegment: TM=" + _tmInfo.TmId + " query='" + Truncate(queryText, 60) + "' returned " + matches.Count + " exact matches");
                     foreach (var m in matches)
                     {
                         var sr = TryBuildSearchResult(m);
@@ -282,7 +282,7 @@ namespace Supervertaler.Trados.TranslationProviders
                         return results;
                     }
                     var matches = reader.SearchConcordance(
-                        _tmInfo.TmId, segment, searchTarget: _reversed, MaxConcordanceResults);
+                        _tmInfo.TmId, segment, MaxConcordanceResults);
                     foreach (var m in matches)
                     {
                         var sr = TryBuildSearchResult(m);
@@ -339,8 +339,8 @@ namespace Supervertaler.Trados.TranslationProviders
                         TmBridgeLog.Warn("SearchTranslationUnit: TmReader.Open() failed: " + (reader.LastError ?? "(no message)"));
                         return results;
                     }
-                    var matches = reader.SearchExact(_tmInfo.TmId, queryText, MaxExactResults, searchTarget: _reversed);
-                    SafeLog("SearchTranslationUnit: TM=" + _tmInfo.TmId + (_reversed ? " [reversed]" : "") + " query='" + Truncate(queryText, 60) + "' returned " + matches.Count + " exact matches");
+                    var matches = reader.SearchExact(_tmInfo.TmId, queryText, MaxExactResults);
+                    SafeLog("SearchTranslationUnit: TM=" + _tmInfo.TmId + " query='" + Truncate(queryText, 60) + "' returned " + matches.Count + " exact matches");
                     foreach (var m in matches)
                     {
                         var sr = TryBuildSearchResult(m);
@@ -597,12 +597,27 @@ namespace Supervertaler.Trados.TranslationProviders
                     "(src=" + SourceLanguage.Name + ", tgt=" + TargetLanguage.Name + ")");
             }
 
-            // When the TM is stored in the reverse direction relative to the
-            // project, the TM's target_text is in the project's SOURCE language
-            // (and vice versa), so swap the two columns onto the project's
-            // source/target segments. Forward TMs map straight through.
-            var srcText = _reversed ? m.TargetText : m.SourceText;
-            var tgtText = _reversed ? m.SourceText : m.TargetText;
+            // Orient THIS row to the project direction. A Supervertaler TM can
+            // hold rows in both directions, so we decide per row (not per TM)
+            // by comparing the row's own languages to the project's source
+            // language, on the base code (en≡en-US, nl≡nl-BE):
+            //   * row source_lang == project source  → forward (no swap)
+            //   * row target_lang == project source  → reversed (swap)
+            //   * neither/unknown (null or odd tags)  → fall back to the
+            //     TM-level orientation worked out in the ctor (_reversed).
+            // This is what makes the en→nl rows you saved into an nl→en TM
+            // surface correctly in an en→nl project.
+            string projectSource = SourceLanguage.Name;
+            bool rowReversed;
+            if (SupervertalerTmProvider.CulturesCompatible(m.SourceLang, projectSource))
+                rowReversed = false;
+            else if (SupervertalerTmProvider.CulturesCompatible(m.TargetLang, projectSource))
+                rowReversed = true;
+            else
+                rowReversed = _reversed;
+
+            var srcText = rowReversed ? m.TargetText : m.SourceText;
+            var tgtText = rowReversed ? m.SourceText : m.TargetText;
 
             var src = new Segment(SourceLanguage);
             src.Add(srcText ?? string.Empty);
