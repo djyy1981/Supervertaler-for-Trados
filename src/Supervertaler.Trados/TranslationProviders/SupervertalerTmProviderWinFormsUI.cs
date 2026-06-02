@@ -97,11 +97,12 @@ namespace Supervertaler.Trados.TranslationProviders
                 return new ITranslationProvider[0];
             }
 
-            // Filter to TMs whose stored source/target language match at
-            // least one of the language pairs Studio is asking about. We
-            // use the same loose match as SupportsLanguageDirection so a
-            // TM stored as bare "nl"/"en" still surfaces for "nl-NL"/"en-GB"
-            // project pairs.
+            // Filter to TMs whose stored languages match at least one of the
+            // language pairs Studio is asking about. Same loose, direction-
+            // agnostic match as SupportsLanguageDirection: base-language only
+            // (so a TM stored as bare "nl"/"en" surfaces for "nl-NL"/"en-GB"
+            // project pairs) and EITHER orientation (so an nl→en TM surfaces
+            // for an en→nl project — the lookup reverses it transparently).
             List<TmInfo> compatible;
             if (languagePairs != null && languagePairs.Length > 0)
             {
@@ -110,8 +111,9 @@ namespace Supervertaler.Trados.TranslationProviders
                 {
                     foreach (var pair in languagePairs)
                     {
-                        if (SupervertalerTmProvider.CulturesCompatible(tm.SourceLang, pair.SourceCulture.Name)
-                            && SupervertalerTmProvider.CulturesCompatible(tm.TargetLang, pair.TargetCulture.Name))
+                        bool reversed;
+                        if (SupervertalerTmProvider.IsCompatibleEitherDirection(
+                                tm, pair.SourceCulture.Name, pair.TargetCulture.Name, out reversed))
                         {
                             compatible.Add(tm);
                             break;

@@ -202,16 +202,26 @@ namespace Supervertaler.Trados.Core
         // ─── Search ────────────────────────────────────────────────────
 
         /// <summary>
-        /// Returns up to <paramref name="maxResults"/> exact-source matches
-        /// in <paramref name="tmId"/>. "Exact" = byte-for-byte equality on the
-        /// <c>source_text</c> column. Hash-first lookup keeps this O(1) at any
-        /// TM size; the hash column is indexed in Workbench's schema.
+        /// Returns up to <paramref name="maxResults"/> exact matches in
+        /// <paramref name="tmId"/>. "Exact" = byte-for-byte equality on the
+        /// query column.
+        ///
+        /// <paramref name="searchTarget"/> selects which column the query text
+        /// is matched against: false = <c>source_text</c> (normal, TM stored in
+        /// the project's direction), true = <c>target_text</c> (the TM is
+        /// stored in the REVERSE direction relative to the project, e.g. an
+        /// nl→en TM attached to an en→nl project — we match the project's
+        /// source text against the TM's English target column). The caller
+        /// (<see cref="SupervertalerTmLanguageDirection"/>) swaps source/target
+        /// on the way out so Studio still sees project-source → project-target.
         /// </summary>
-        public List<BridgedTu> SearchExact(string tmId, string sourceText, int maxResults = 5)
+        public List<BridgedTu> SearchExact(string tmId, string sourceText, int maxResults = 5, bool searchTarget = false)
         {
             var result = new List<BridgedTu>();
             if (_connection == null || string.IsNullOrEmpty(tmId) || sourceText == null)
                 return result;
+
+            var queryColumn = searchTarget ? "target_text" : "source_text";
 
             try
             {
@@ -224,7 +234,7 @@ namespace Supervertaler.Trados.Core
                                usage_count, created_by
                         FROM translation_units
                         WHERE tm_id = $tm_id
-                          AND source_text = $src
+                          AND " + queryColumn + @" = $src
                         ORDER BY modified_date DESC
                         LIMIT $limit";
                     cmd.Parameters.AddWithValue("$tm_id", tmId);

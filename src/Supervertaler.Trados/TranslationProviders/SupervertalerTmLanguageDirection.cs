@@ -45,6 +45,13 @@ namespace Supervertaler.Trados.TranslationProviders
         private readonly TmInfo _tmInfo;
         private readonly string _dbPath;
 
+        // True when the TM is stored in the REVERSE direction relative to the
+        // project this language direction serves — e.g. an nl→en TM attached
+        // to an en→nl project. When reversed we match the project's source
+        // text against the TM's target_text column and swap source/target when
+        // building results, so Studio still sees project-source→project-target.
+        private readonly bool _reversed;
+
         internal SupervertalerTmLanguageDirection(
             SupervertalerTmProvider provider,
             LanguagePair languagePair,
@@ -55,12 +62,34 @@ namespace Supervertaler.Trados.TranslationProviders
             _languagePair = languagePair ?? throw new ArgumentNullException(nameof(languagePair));
             _tmInfo = tmInfo;
             _dbPath = dbPath;
+
+            // Decide orientation once, here, so every search method agrees.
+            try
+            {
+                if (tmInfo != null)
+                {
+                    bool reversed;
+                    SupervertalerTmProvider.IsCompatibleEitherDirection(
+                        tmInfo,
+                        languagePair.SourceCulture.Name,
+                        languagePair.TargetCulture.Name,
+                        out reversed);
+                    _reversed = reversed;
+                }
+            }
+            catch (Exception ex)
+            {
+                TmBridgeLog.Error("LanguageDirection ctor: orientation detection threw (assuming forward)", ex);
+                _reversed = false;
+            }
+
             try
             {
                 TmBridgeLog.Info(
                     "LanguageDirection ctor: TM=" + (tmInfo != null ? tmInfo.Name : "(null)") +
                     ", langPair=" + (languagePair.SourceCulture.Name ?? "(empty)") +
-                    "->" + (languagePair.TargetCulture.Name ?? "(empty)"));
+                    "->" + (languagePair.TargetCulture.Name ?? "(empty)") +
+                    (_reversed ? " [REVERSED]" : ""));
             }
             catch (Exception ex)
             {
@@ -178,8 +207,8 @@ namespace Supervertaler.Trados.TranslationProviders
                         return results;
                     }
 
-                    var matches = reader.SearchExact(_tmInfo.TmId, queryText, MaxExactResults);
-                    SafeLog("SearchSegment: TM=" + _tmInfo.TmId + " query='" + Truncate(queryText, 60) + "' returned " + matches.Count + " exact matches");
+                    var matches = reader.SearchExact(_tmInfo.TmId, queryText, MaxExactResults, searchTarget: _reversed);
+                    SafeLog("SearchSegment: TM=" + _tmInfo.TmId + (_reversed ? " [reversed]" : "") + " query='" + Truncate(queryText, 60) + "' returned " + matches.Count + " exact matches");
                     foreach (var m in matches)
                     {
                         var sr = TryBuildSearchResult(m);
@@ -236,18 +265,12 @@ namespace Supervertaler.Trados.TranslationProviders
             var results = NewSearchResultsFromText(segment);
             if (_tmInfo == null || string.IsNullOrEmpty(segment)) return results;
 
-            // Direction comes from settings.Mode – source-side or target-side
-            // concordance. Default to source if Studio passes something we
-            // don't recognise.
-            var searchTarget = settings != null
-                && settings.Mode == SearchMode.ConcordanceSearch
-                && false; // SearchMode doesn't distinguish src/tgt at this level
-            // Studio actually issues two separate concordance calls (one with
-            // each direction); we cover both by also looking at TargetConcordance
-            // in higher-level callers. For SearchText specifically, the convention
-            // is that the caller has already picked the direction it wants, so
-            // we run the source-side search here and let SearchTranslationUnit
-            // handle the target variant.
+            // SearchText is source-side concordance: the query text is in the
+            // project's source language, so we match it against whichever TM
+            // column holds that language. Normally that's source_text; when the
+            // TM is stored in the reverse direction (project source = TM target
+            // language) we search target_text instead. TryBuildSearchResult /
+            // BuildTranslationUnit then swap source/target back for Studio.
 
             try
             {
@@ -259,7 +282,7 @@ namespace Supervertaler.Trados.TranslationProviders
                         return results;
                     }
                     var matches = reader.SearchConcordance(
-                        _tmInfo.TmId, segment, searchTarget: false, MaxConcordanceResults);
+                        _tmInfo.TmId, segment, searchTarget: _reversed, MaxConcordanceResults);
                     foreach (var m in matches)
                     {
                         var sr = TryBuildSearchResult(m);
@@ -316,8 +339,8 @@ namespace Supervertaler.Trados.TranslationProviders
                         TmBridgeLog.Warn("SearchTranslationUnit: TmReader.Open() failed: " + (reader.LastError ?? "(no message)"));
                         return results;
                     }
-                    var matches = reader.SearchExact(_tmInfo.TmId, queryText, MaxExactResults);
-                    SafeLog("SearchTranslationUnit: TM=" + _tmInfo.TmId + " query='" + Truncate(queryText, 60) + "' returned " + matches.Count + " exact matches");
+                    var matches = reader.SearchExact(_tmInfo.TmId, queryText, MaxExactResults, searchTarget: _reversed);
+                    SafeLog("SearchTranslationUnit: TM=" + _tmInfo.TmId + (_reversed ? " [reversed]" : "") + " query='" + Truncate(queryText, 60) + "' returned " + matches.Count + " exact matches");
                     foreach (var m in matches)
                     {
                         var sr = TryBuildSearchResult(m);
@@ -574,11 +597,18 @@ namespace Supervertaler.Trados.TranslationProviders
                     "(src=" + SourceLanguage.Name + ", tgt=" + TargetLanguage.Name + ")");
             }
 
+            // When the TM is stored in the reverse direction relative to the
+            // project, the TM's target_text is in the project's SOURCE language
+            // (and vice versa), so swap the two columns onto the project's
+            // source/target segments. Forward TMs map straight through.
+            var srcText = _reversed ? m.TargetText : m.SourceText;
+            var tgtText = _reversed ? m.SourceText : m.TargetText;
+
             var src = new Segment(SourceLanguage);
-            src.Add(m.SourceText ?? string.Empty);
+            src.Add(srcText ?? string.Empty);
 
             var tgt = new Segment(TargetLanguage);
-            tgt.Add(m.TargetText ?? string.Empty);
+            tgt.Add(tgtText ?? string.Empty);
 
             // v4.20.33: stamp OriginSystem with the specific bridged TM so
             // Studio's per-hit "origin" labels (the small grey strip at the

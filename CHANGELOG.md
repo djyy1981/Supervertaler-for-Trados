@@ -1,5 +1,12 @@
 # Changelog
 
+## [4.20.41] – 2026-06-02
+
+### Fixed (Shared TM bridge)
+
+- **Bridged Supervertaler TMs now attach to a project regardless of their stored direction.** A TM bridged from Supervertaler Workbench was only offered to a Studio project when it was stored in the *exact same* direction as the project — so a Dutch→English TM was invisible to an English→Dutch project, with the misleading "None of the bridged Supervertaler TMs match this project's language pair" message. Matching is now **direction-agnostic and on the base language** (so `en` matches `en-US`, `nl` matches `nl-BE`, in either orientation): a TM is offered whenever it covers the project's two languages, whichever way round it was created. Crucially, the lookup follows through — when a TM is attached in the reverse direction, exact and concordance searches query the TM's *other* column and swap source/target on the way out, so Studio still sees correct project-source → project-target hits rather than empty or backwards results. (Regional-variant matching was already correct; the gap was the direction check.)
+
+
 ## [4.20.40] – 2026-05-29
 
 ### Changed (Claude Opus 4.8)

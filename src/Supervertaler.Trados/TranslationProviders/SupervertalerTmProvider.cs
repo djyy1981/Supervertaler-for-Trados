@@ -216,13 +216,14 @@ namespace Supervertaler.Trados.TranslationProviders
                 string src = SafeGetCultureName(languageDirection.SourceCulture);
                 string tgt = SafeGetCultureName(languageDirection.TargetCulture);
 
-                bool ok = CulturesCompatible(_tmInfo.SourceLang, src)
-                       && CulturesCompatible(_tmInfo.TargetLang, tgt);
+                bool reversed;
+                bool ok = IsCompatibleEitherDirection(_tmInfo, src, tgt, out reversed);
 
                 TmBridgeLog.Info(
                     "SupportsLanguageDirection: TM=" + _tmInfo.Name +
                     " (" + _tmInfo.SourceLang + "->" + _tmInfo.TargetLang +
-                    ") vs project (" + src + "->" + tgt + ") => " + ok);
+                    ") vs project (" + src + "->" + tgt + ") => " + ok +
+                    (ok && reversed ? " (reversed)" : ""));
                 return ok;
             }
             catch (Exception ex)
@@ -287,6 +288,32 @@ namespace Supervertaler.Trados.TranslationProviders
             var primaryA = PrimaryLangTag(a);
             var primaryB = PrimaryLangTag(b);
             return string.Equals(primaryA, primaryB, StringComparison.OrdinalIgnoreCase);
+        }
+
+        /// <summary>
+        /// Direction-agnostic language-pair match between a bridged TM and a
+        /// project language pair, on BASE language codes (so en≡en-US,
+        /// nl≡nl-BE). A TM whose languages line up with the project pair in
+        /// EITHER orientation is compatible — so an nl→en TM attaches to an
+        /// en→nl project. <paramref name="reversed"/> reports whether the
+        /// match was reverse-orientation (TM source = project target), which
+        /// the language-direction lookup uses to query the right column and
+        /// swap source/target on the way out. Forward wins ties (a symmetric
+        /// nl→nl pair is treated as forward).
+        /// </summary>
+        internal static bool IsCompatibleEitherDirection(
+            TmInfo tm, string projectSource, string projectTarget, out bool reversed)
+        {
+            reversed = false;
+            if (tm == null) return false;
+
+            bool forward = CulturesCompatible(tm.SourceLang, projectSource)
+                        && CulturesCompatible(tm.TargetLang, projectTarget);
+            bool reverse = CulturesCompatible(tm.SourceLang, projectTarget)
+                        && CulturesCompatible(tm.TargetLang, projectSource);
+
+            reversed = reverse && !forward;
+            return forward || reverse;
         }
 
         private static string PrimaryLangTag(string code)
