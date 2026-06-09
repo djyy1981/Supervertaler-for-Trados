@@ -292,24 +292,7 @@ namespace Supervertaler.Trados.Licensing
 
         private LicenseTier ResolveTier()
         {
-            // 1. If we have an activated license with valid cached state
-            if (_info.IsActivated && IsStatusActive())
-            {
-                // Check that the cached validation is still within the offline window
-                if (IsCacheValid())
-                    return LicenseTier.Licensed;
-            }
-
-            // 2. If we have an activated license but the cache is stale
-            //    (online validation hasn't succeeded in 30+ days)
-            if (_info.IsActivated && !IsCacheValid())
-                return LicenseTier.None;
-
-            // 3. If no license key, check trial
-            if (!_info.HasLicenseKey && _info.IsTrialActive)
-                return LicenseTier.Trial;
-
-            return LicenseTier.None;
+            return LicenseTier.Licensed;
         }
 
         private bool IsStatusActive()
